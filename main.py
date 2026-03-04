@@ -44,6 +44,12 @@ class AnvilStartResponse(BaseModel):
     status: str
 
 
+class AnvilStopResponse(BaseModel):
+    """Response from stopping Anvil"""
+    status: str
+    message: str
+
+
 class PrivateKeyInfo(BaseModel):
     """Private key and address pair"""
     address: str
@@ -160,6 +166,70 @@ async def start_anvil(config: Optional[AnvilConfig] = None):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to start Anvil: {str(e)}"
+        )
+
+
+@app.post("/anvil/stop", response_model=AnvilStopResponse)
+async def stop_anvil():
+    """
+    Stop a running Anvil instance.
+
+    Returns 400 if no Anvil instance is running.
+    Gracefully terminates the process.
+    """
+    global anvil_process, anvil_start_time, anvil_config
+
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anvil instance is running"
+        )
+
+    try:
+        # Get process group for clean termination
+        pid = anvil_process.pid
+
+        if os.name != "nt":
+            # Unix: kill the process group
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+        else:
+            # Windows: terminate process
+            anvil_process.terminate()
+
+        # Wait for process to exit
+        anvil_process.wait(timeout=5)
+
+        # Clear state
+        anvil_process = None
+        anvil_start_time = None
+        anvil_config = None
+
+        return AnvilStopResponse(
+            status="stopped",
+            message=f"Anvil instance (PID {pid}) has been stopped"
+        )
+
+    except subprocess.TimeoutExpired:
+        # Force kill if graceful shutdown fails
+        if os.name != "nt":
+            os.killpg(os.getpgid(anvil_process.pid), signal.SIGKILL)
+        else:
+            anvil_process.kill()
+
+        anvil_process = None
+        anvil_start_time = None
+        anvil_config = None
+
+        return AnvilStopResponse(
+            status="stopped",
+            message=f"Anvil instance was forcefully stopped"
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to stop Anvil: {str(e)}"
         )
 
 

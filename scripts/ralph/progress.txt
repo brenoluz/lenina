@@ -46,3 +46,22 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - Handle subprocess.TimeoutExpired to force kill if graceful shutdown fails
 ---
 
+## 2026-03-04 09:00 - US-003
+- Implemented POST `/anvil/restart` endpoint
+- Created AnvilRestartResponse Pydantic model
+- Endpoint stops running instance (if any) and starts with preserved or new config
+- Reuses same graceful termination logic as stop endpoint
+- Clears global state before restart, resets deployed contracts tracking
+- Returns 200 with new PID, port, chainId, status, and message
+
+**Files changed:**
+- main.py (added AnvilRestartResponse model and restart_anvil endpoint)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- When restarting, check if process exists but isn't running to clean up stale state
+- Preserve config from anvil_config global if no new config provided
+- Inline the start logic rather than calling start_anvil to avoid double-checking "already running" errors
+- Reset deployed_contracts on restart to match fresh blockchain state
+---
+

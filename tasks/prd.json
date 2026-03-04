@@ -57,7 +57,8 @@
       "endpoint": {
         "method": "POST",
         "path": "/anvil/restart"
-      }
+      },
+      "passes": true
     },
     {
       "id": "US-004",

@@ -50,6 +50,15 @@ class AnvilStopResponse(BaseModel):
     message: str
 
 
+class AnvilRestartResponse(BaseModel):
+    """Response from restarting Anvil"""
+    pid: int
+    port: int
+    chainId: int
+    status: str
+    message: str
+
+
 class PrivateKeyInfo(BaseModel):
     """Private key and address pair"""
     address: str
@@ -230,6 +239,118 @@ async def stop_anvil():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to stop Anvil: {str(e)}"
+        )
+
+
+@app.post("/anvil/restart", response_model=AnvilRestartResponse)
+async def restart_anvil(config: Optional[AnvilConfig] = None):
+    """
+    Restart a running Anvil instance.
+
+    Preserves configuration from previous run or accepts new config.
+    Returns 200 with new process details on success.
+    """
+    global anvil_process, anvil_start_time, anvil_config
+
+    # If no config provided, use the current running config
+    if config is None and anvil_config is not None:
+        config = AnvilConfig(**anvil_config)
+
+    # Stop the current instance if running (don't error if not running)
+    if anvil_process is not None and anvil_process.poll() is not None:
+        # Process exists but isn't running, clean up state
+        anvil_process = None
+        anvil_start_time = None
+        anvil_config = None
+    elif anvil_process is not None:
+        # Gracefully stop the running instance
+        pid = anvil_process.pid
+        try:
+            if os.name != "nt":
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+            else:
+                anvil_process.terminate()
+            anvil_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            if os.name != "nt":
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+            else:
+                anvil_process.kill()
+        except Exception:
+            pass
+        finally:
+            anvil_process = None
+            anvil_start_time = None
+            anvil_config = None
+
+    # Now start Anvil with the config
+    # Reuse the start logic inline to avoid cross-function calls
+    cfg = config.dict() if config else {}
+    port = cfg.get("port", 8545)
+    chain_id = cfg.get("chainId", 31337)
+    block_time = cfg.get("blockTime", 0)
+    gas_limit = cfg.get("gasLimit", 30000000)
+    mnemonic = cfg.get("mnemonic")
+
+    cmd = [
+        "anvil",
+        "--port", str(port),
+        "--chain-id", str(chain_id),
+        "--gas-limit", str(gas_limit),
+    ]
+
+    if block_time > 0:
+        cmd.extend(["--block-time", str(block_time)])
+
+    if mnemonic:
+        cmd.extend(["--mnemonic", mnemonic])
+
+    try:
+        anvil_process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            preexec_fn=os.setsid if os.name != "nt" else None
+        )
+
+        await asyncio.sleep(0.5)
+
+        if anvil_process.poll() is not None:
+            stderr_output = anvil_process.stderr.read() if anvil_process.stderr else ""
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to start Anvil: {stderr_output}"
+            )
+
+        anvil_start_time = time.time()
+        anvil_config = {
+            "port": port,
+            "chainId": chain_id,
+            "blockTime": block_time,
+            "gasLimit": gas_limit,
+            "mnemonic": mnemonic
+        }
+
+        deployed_contracts.clear()
+
+        return AnvilRestartResponse(
+            pid=anvil_process.pid,
+            port=port,
+            chainId=chain_id,
+            status="running",
+            message="Anvil instance restarted successfully"
+        )
+
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=500,
+            detail="Anvil not found. Ensure Foundry is installed."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to restart Anvil: {str(e)}"
         )
 
 

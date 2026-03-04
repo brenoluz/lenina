@@ -122,7 +122,8 @@
       "endpoint": {
         "method": "GET",
         "path": "/anvil/status"
-      }
+      },
+      "passes": true
     },
     {
       "id": "US-008",

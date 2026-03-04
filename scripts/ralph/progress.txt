@@ -124,3 +124,21 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - Return 500 if config is missing even when process is running (defensive programming)
 ---
 
+## 2026-03-04 - US-007
+- Implemented GET `/anvil/status` endpoint
+- Created AnvilStatus Pydantic model (already existed, reused)
+- Endpoint returns running state with pid, uptime, and port
+- Returns 200 regardless of running state (returns nulls when not running)
+- Reuses existing global state (anvil_process, anvil_start_time, anvil_config)
+
+**Files changed:**
+- main.py (added get_anvil_status endpoint)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Return type annotation `-> AnvilStatus` required for strict mypy compliance
+- Use `anvil_process.poll() is not None` to check if process is not running
+- Calculate uptime as `time.time() - anvil_start_time` when both are available
+- Always return 200 for status endpoints - the `running` field indicates state
+---
+

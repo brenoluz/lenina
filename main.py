@@ -437,6 +437,34 @@ async def stop_anvil():
         )
 
 
+@app.get("/anvil/status", response_model=AnvilStatus)
+async def get_anvil_status() -> AnvilStatus:
+    """
+    Get Anvil running status.
+
+    Response includes: running (boolean), pid, uptime, port.
+    Returns 200 regardless of running state.
+    """
+    # Check if Anvil is running
+    is_running = anvil_process is not None and anvil_process.poll() is None
+
+    if is_running:
+        uptime = time.time() - anvil_start_time if anvil_start_time else None
+        return AnvilStatus(
+            running=True,
+            pid=anvil_process.pid,
+            uptime=uptime,
+            port=anvil_config.get("port") if anvil_config else None
+        )
+    else:
+        return AnvilStatus(
+            running=False,
+            pid=None,
+            uptime=None,
+            port=None
+        )
+
+
 @app.post("/anvil/restart", response_model=AnvilRestartResponse)
 async def restart_anvil(config: Optional[AnvilConfig] = None):
     """

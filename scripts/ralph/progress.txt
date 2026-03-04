@@ -65,3 +65,23 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - Reset deployed_contracts on restart to match fresh blockchain state
 ---
 
+## 2026-03-04 10:41 - US-004
+- Implemented GET `/anvil/keys` endpoint
+- Created AnvilKeysResponse and PrivateKeyInfo Pydantic models
+- Implemented account parsing from Anvil's startup output using regex
+- Added anvil_accounts global state to store parsed accounts
+- Returns 400 if Anvil is not running, 500 if accounts couldn't be parsed
+- Response includes accounts list with address and privateKey for each, plus optional mnemonic
+
+**Files changed:**
+- main.py (added AnvilKeysResponse model, get_private_keys endpoint, account parsing logic, anvil_accounts global state)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use `stderr=subprocess.STDOUT` to capture all Anvil output in a single stream for parsing
+- Anvil outputs accounts and keys in numbered format: `(0) 0x... (10000 ETH)` and `(0) 0x...`
+- Parse both addresses and private keys using regex patterns, then match by index
+- Always clear anvil_accounts when stopping/restarting to avoid stale data
+- Declare all modified globals in each function that modifies them
+---
+

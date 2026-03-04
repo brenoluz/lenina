@@ -73,7 +73,8 @@
       "endpoint": {
         "method": "GET",
         "path": "/anvil/keys"
-      }
+      },
+      "passes": true
     },
     {
       "id": "US-005",

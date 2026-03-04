@@ -59,6 +59,12 @@ class AnvilRestartResponse(BaseModel):
     message: str
 
 
+class AnvilKeysResponse(BaseModel):
+    """Response from getting private keys"""
+    accounts: List[PrivateKeyInfo]
+    mnemonic: Optional[str] = None
+
+
 class PrivateKeyInfo(BaseModel):
     """Private key and address pair"""
     address: str
@@ -77,6 +83,7 @@ class ContractInfo(BaseModel):
 anvil_process: Optional[subprocess.Popen] = None
 anvil_start_time: Optional[float] = None
 anvil_config: Optional[Dict[str, Any]] = None
+anvil_accounts: List[PrivateKeyInfo] = []
 deployed_contracts: List[Dict[str, Any]] = []
 
 
@@ -84,6 +91,33 @@ deployed_contracts: List[Dict[str, Any]] = []
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/anvil/keys", response_model=AnvilKeysResponse)
+async def get_private_keys():
+    """
+    Retrieve Anvil's generated private keys and addresses.
+
+    Returns 400 if Anvil is not running.
+    Response includes at least 10 default accounts with private keys.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anvil instance is running"
+        )
+
+    if not anvil_accounts:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve private keys from Anvil"
+        )
+
+    return AnvilKeysResponse(
+        accounts=anvil_accounts,
+        mnemonic=anvil_config.get("mnemonic") if anvil_config else None
+    )
 
 
 @app.post("/anvil/start", response_model=AnvilStartResponse)
@@ -94,7 +128,7 @@ async def start_anvil(config: Optional[AnvilConfig] = None):
     Returns 400 if Anvil is already running.
     Returns 500 if Anvil fails to start.
     """
-    global anvil_process, anvil_start_time, anvil_config
+    global anvil_process, anvil_start_time, anvil_config, anvil_accounts
 
     # Check if already running
     if anvil_process is not None and anvil_process.poll() is None:
@@ -130,12 +164,12 @@ async def start_anvil(config: Optional[AnvilConfig] = None):
         anvil_process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
             preexec_fn=os.setsid if os.name != "nt" else None
         )
 
-        # Wait a moment for Anvil to start
+        # Wait a moment for Anvil to start and read output
         await asyncio.sleep(0.5)
 
         # Check if process is still running
@@ -146,6 +180,34 @@ async def start_anvil(config: Optional[AnvilConfig] = None):
                 status_code=500,
                 detail=f"Failed to start Anvil: {stderr_output}"
             )
+
+        # Parse Anvil's output to extract private keys and addresses
+        # Anvil outputs account info in format:
+        # Available Accounts
+        # ==================
+        # (0) 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (10000 ETH)
+        #
+        # Private Keys
+        # ==================
+        # (0) 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+        output = anvil_process.stdout.read(8192) if anvil_process.stdout else ""
+
+        # Parse addresses and private keys using regex
+        address_pattern = r"\((\d+)\)\s+(0x[0-9a-fA-F]+)\s+\("
+        key_pattern = r"\((\d+)\)\s+(0x[0-9a-fA-F]+)$"
+
+        addresses = re.findall(address_pattern, output)
+        private_keys = re.findall(key_pattern, output, re.MULTILINE)
+
+        # Clear and populate accounts
+        anvil_accounts.clear()
+        min_count = min(len(addresses), len(private_keys))
+
+        for i in range(min_count):
+            anvil_accounts.append(PrivateKeyInfo(
+                address=addresses[i][1],
+                privateKey=private_keys[i][1]
+            ))
 
         anvil_start_time = time.time()
         anvil_config = {
@@ -186,7 +248,7 @@ async def stop_anvil():
     Returns 400 if no Anvil instance is running.
     Gracefully terminates the process.
     """
-    global anvil_process, anvil_start_time, anvil_config
+    global anvil_process, anvil_start_time, anvil_config, anvil_accounts
 
     # Check if Anvil is running
     if anvil_process is None or anvil_process.poll() is not None:
@@ -213,6 +275,7 @@ async def stop_anvil():
         anvil_process = None
         anvil_start_time = None
         anvil_config = None
+        anvil_accounts.clear()
 
         return AnvilStopResponse(
             status="stopped",
@@ -229,6 +292,7 @@ async def stop_anvil():
         anvil_process = None
         anvil_start_time = None
         anvil_config = None
+        anvil_accounts.clear()
 
         return AnvilStopResponse(
             status="stopped",
@@ -250,7 +314,7 @@ async def restart_anvil(config: Optional[AnvilConfig] = None):
     Preserves configuration from previous run or accepts new config.
     Returns 200 with new process details on success.
     """
-    global anvil_process, anvil_start_time, anvil_config
+    global anvil_process, anvil_start_time, anvil_config, anvil_accounts
 
     # If no config provided, use the current running config
     if config is None and anvil_config is not None:
@@ -282,6 +346,7 @@ async def restart_anvil(config: Optional[AnvilConfig] = None):
             anvil_process = None
             anvil_start_time = None
             anvil_config = None
+            anvil_accounts.clear()
 
     # Now start Anvil with the config
     # Reuse the start logic inline to avoid cross-function calls
@@ -322,6 +387,26 @@ async def restart_anvil(config: Optional[AnvilConfig] = None):
                 status_code=500,
                 detail=f"Failed to start Anvil: {stderr_output}"
             )
+
+        # Parse Anvil's output to extract private keys and addresses
+        output = anvil_process.stdout.read(8192) if anvil_process.stdout else ""
+
+        # Parse addresses and private keys using regex
+        address_pattern = r"\((\d+)\)\s+(0x[0-9a-fA-F]+)\s+\("
+        key_pattern = r"\((\d+)\)\s+(0x[0-9a-fA-F]+)$"
+
+        addresses = re.findall(address_pattern, output)
+        private_keys = re.findall(key_pattern, output, re.MULTILINE)
+
+        # Clear and populate accounts
+        anvil_accounts.clear()
+        min_count = min(len(addresses), len(private_keys))
+
+        for i in range(min_count):
+            anvil_accounts.append(PrivateKeyInfo(
+                address=addresses[i][1],
+                privateKey=private_keys[i][1]
+            ))
 
         anvil_start_time = time.time()
         anvil_config = {

@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  lenina:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lenina
+    ports:
+      # Lenina API port
+      - "${LENINA_PORT:-8000}:8000"
+      # Anvil RPC port
+      - "${ANVIL_PORT:-8545}:8545"
+    environment:
+      # Lenina API configuration
+      - LENINA_PORT=8000
+      # Anvil configuration
+      - ANVIL_PORT=8545
+      - ANVIL_CHAIN_ID=${ANVIL_CHAIN_ID:-31337}
+      - ANVIL_GAS_LIMIT=${ANVIL_GAS_LIMIT:-30000000}
+      - ANVIL_MNEMONIC=${ANVIL_MNEMONIC:-}
+    volumes:
+      # Mount local code for development (optional, comment out for production)
+      - ./main.py:/app/main.py:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

@@ -90,7 +90,8 @@
       "endpoint": {
         "method": "GET",
         "path": "/anvil/contract/:address"
-      }
+      },
+      "passes": true
     },
     {
       "id": "US-006",

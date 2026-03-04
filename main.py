@@ -1,7 +1,7 @@
 """
 Lenina - Anvil RESTful Management API
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import subprocess
@@ -11,6 +11,7 @@ import os
 import signal
 import time
 from datetime import datetime
+import httpx
 
 app = FastAPI(
     title="Lenina",
@@ -79,6 +80,14 @@ class ContractInfo(BaseModel):
     abi: Optional[Dict] = None
 
 
+class ContractDetailsResponse(BaseModel):
+    """Response from checking contract at address"""
+    address: str
+    bytecodeHash: str
+    deploymentBlock: Optional[int] = None
+    bytecode: str
+
+
 # Global state
 anvil_process: Optional[subprocess.Popen] = None
 anvil_start_time: Optional[float] = None
@@ -118,6 +127,85 @@ async def get_private_keys():
         accounts=anvil_accounts,
         mnemonic=anvil_config.get("mnemonic") if anvil_config else None
     )
+
+
+@app.get("/anvil/contract/{address}", response_model=ContractDetailsResponse)
+async def get_contract(address: str = Path(..., description="Contract address to check")):
+    """
+    Check if a contract exists at the specified address.
+
+    Returns 200 with contract info (bytecode, bytecodeHash) if deployed.
+    Returns 404 if no contract at address.
+    Returns 400 if Anvil is not running.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anvil instance is running"
+        )
+
+    # Validate address format
+    if not re.match(r"^0x[0-9a-fA-F]{40}$", address):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Ethereum address format"
+        )
+
+    # Get the Anvil port from config
+    port = anvil_config.get("port", 8545) if anvil_config else 8545
+    rpc_url = f"http://127.0.0.1:{port}"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # Use eth_getCode to check if contract exists at address
+            response = await client.post(
+                rpc_url,
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "eth_getCode",
+                    "params": [address, "latest"],
+                    "id": 1
+                },
+                timeout=10.0
+            )
+            result = response.json()
+
+            if "error" in result:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"RPC error: {result['error'].get('message', 'Unknown error')}"
+                )
+
+            bytecode = result.get("result", "0x")
+
+            # If bytecode is "0x" or empty, no contract at address
+            if bytecode == "0x" or not bytecode:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No contract deployed at address {address}"
+                )
+
+            # Calculate bytecode hash
+            import hashlib
+            bytecode_hash = "0x" + hashlib.sha256(bytecode.encode()).hexdigest()
+
+            return ContractDetailsResponse(
+                address=address,
+                bytecodeHash=bytecode_hash,
+                bytecode=bytecode
+            )
+
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=400,
+            detail="Timeout connecting to Anvil RPC"
+        )
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to connect to Anvil RPC: {str(e)}"
+        )
 
 
 @app.post("/anvil/start", response_model=AnvilStartResponse)

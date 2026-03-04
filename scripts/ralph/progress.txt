@@ -85,3 +85,24 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - Declare all modified globals in each function that modifies them
 ---
 
+## 2026-03-04 - US-005
+- Implemented GET `/anvil/contract/{address}` endpoint
+- Created ContractDetailsResponse Pydantic model with address, bytecodeHash, bytecode fields
+- Used httpx async client to make eth_getCode RPC calls to Anvil
+- Validates Ethereum address format with regex before making RPC call
+- Returns 404 when bytecode is "0x" (no contract), 200 with bytecode details when deployed
+- Returns 400 if Anvil is not running or RPC errors occur
+- Calculates SHA256 hash of bytecode for bytecodeHash field
+
+**Files changed:**
+- main.py (added ContractDetailsResponse model, get_contract endpoint, httpx import)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use `eth_getCode` RPC method to check contract existence - returns "0x" for non-contracts
+- Validate address format with `^0x[0-9a-fA-F]{40}$` regex before making RPC calls
+- Use `httpx.AsyncClient` for async HTTP requests in FastAPI endpoints
+- Always wrap RPC calls in try/except for proper error handling (timeouts, connection errors)
+- SHA256 hash of bytecode provides a unique identifier for contract code
+---
+

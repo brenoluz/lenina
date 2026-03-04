@@ -88,6 +88,17 @@ class ContractDetailsResponse(BaseModel):
     bytecode: str
 
 
+class AnvilConfigResponse(BaseModel):
+    """Response from getting Anvil configuration"""
+    ip: str
+    port: int
+    chainId: int
+    version: str
+    blockTime: int
+    gasLimit: int
+    mnemonic: Optional[str] = None
+
+
 # Global state
 anvil_process: Optional[subprocess.Popen] = None
 anvil_start_time: Optional[float] = None
@@ -100,6 +111,38 @@ deployed_contracts: List[Dict[str, Any]] = []
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/anvil/config", response_model=AnvilConfigResponse)
+async def get_config():
+    """
+    Get Anvil configuration.
+
+    Response includes: IP, port, chainId, version, blockTime, gasLimit, etc.
+    Returns 400 if Anvil is not running.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anvil instance is running"
+        )
+
+    if not anvil_config:
+        raise HTTPException(
+            status_code=500,
+            detail="Anvil configuration not available"
+        )
+
+    return AnvilConfigResponse(
+        ip="127.0.0.1",
+        port=anvil_config.get("port", 8545),
+        chainId=anvil_config.get("chainId", 31337),
+        version="0.1.0",
+        blockTime=anvil_config.get("blockTime", 0),
+        gasLimit=anvil_config.get("gasLimit", 30000000),
+        mnemonic=anvil_config.get("mnemonic")
+    )
 
 
 @app.get("/anvil/keys", response_model=AnvilKeysResponse)

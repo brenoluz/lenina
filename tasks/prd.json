@@ -106,7 +106,8 @@
       "endpoint": {
         "method": "GET",
         "path": "/anvil/config"
-      }
+      },
+      "passes": true
     },
     {
       "id": "US-007",

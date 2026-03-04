@@ -106,3 +106,21 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - SHA256 hash of bytecode provides a unique identifier for contract code
 ---
 
+## 2026-03-04 - US-006
+- Implemented GET `/anvil/config` endpoint
+- Created AnvilConfigResponse Pydantic model with ip, port, chainId, version, blockTime, gasLimit, mnemonic fields
+- Returns 400 if Anvil is not running, 500 if config unavailable
+- Reuses anvil_config global state populated during Anvil start
+- Response includes all configuration parameters: IP (127.0.0.1), port, chainId, version, blockTime, gasLimit, mnemonic
+
+**Files changed:**
+- main.py (added AnvilConfigResponse model and get_config endpoint)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Store all Anvil config in anvil_config global dict at module level for easy access
+- Use ip="127.0.0.1" as default since Anvil binds to localhost
+- Follow existing pattern: check `anvil_process is None or anvil_process.poll() is not None` for running state
+- Return 500 if config is missing even when process is running (defensive programming)
+---
+

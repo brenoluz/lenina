@@ -162,3 +162,120 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - Typecheck requires `-> RpcResponse` return annotation on the endpoint
 
 ---
+
+## 2026-03-04 - US-009
+- Implemented Docker containerization for Lenina
+- Created Dockerfile with Python 3.11 slim base image
+- Installed Foundry/Anvil using foundryup in container
+- Created docker-compose.yml for easy local development
+- Added health check endpoint configuration (curl to /health)
+- Exposed ports: 8000 (Lenina API) and 8545 (Anvil RPC)
+- Fixed existing type errors in main.py to ensure typecheck passes
+- Environment variables supported: LENINA_PORT, ANVIL_PORT, ANVIL_CHAIN_ID, ANVIL_GAS_LIMIT, ANVIL_MNEMONIC
+
+**Files changed:**
+- Dockerfile (created)
+- docker-compose.yml (created)
+- main.py (fixed type annotations for mypy compliance)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use `curl -L https://foundry.paradigm.xyz | bash` then `foundryup` to install Anvil in Docker
+- Set `ENV PATH="/root/.foundry/bin:${PATH}"` to make anvil available in PATH
+- Use `HEALTHCHECK` instruction in Dockerfile for container health monitoring
+- Use python:3.11-slim for smaller image size while maintaining Python 3.10+ compatibility
+- mypy strict mode requires explicit `Optional[T]` for all potentially None values and return type annotations
+
+**Codebase Patterns:**
+- Type annotations must include `-> ReturnType` for all FastAPI endpoints to pass mypy strict mode
+- Use `subprocess.Popen[Any]` for typed subprocess handling
+---
+
+## 2026-03-04 - US-010
+- Implemented GET `/anvil/contracts` endpoint
+- Created ContractsListResponse Pydantic model for listing contracts
+- Reuses existing deployed_contracts global state and ContractInfo model
+- Returns 400 if Anvil is not running
+- Returns empty contracts list when no contracts deployed (session starts fresh)
+
+**Files changed:**
+- main.py (added ContractsListResponse model and list_contracts endpoint)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use existing global `deployed_contracts` list for in-memory contract tracking
+- Follow pattern: check `anvil_process is None or anvil_process.poll() is not None` for running state
+- Return empty list (not error) when no contracts deployed - consistent with list endpoint semantics
+- Contract tracking resets on restart (deployed_contracts.clear() in restart logic)
+---
+
+## 2026-03-04 - US-011
+- Implemented comprehensive project documentation
+- Created README.md in project root with:
+  - Project overview and features
+  - Quick start guide (Docker and local setup)
+  - Complete API endpoints reference with examples
+  - Configuration options (environment variables)
+  - Usage examples for all endpoints
+- Created /docs folder with detailed documentation:
+  - docs/api.md - Complete API reference with all endpoints
+  - docs/architecture.md - System architecture and design patterns
+  - docs/deployment.md - Production and development deployment guide
+- README.md links to /docs for extended documentation
+- Included Docker setup instructions and examples
+
+**Files changed:**
+- README.md (created)
+- docs/api.md (created)
+- docs/architecture.md (created)
+- docs/deployment.md (created)
+- main.py (fixed type errors in deployed_contracts and pid handling)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use comprehensive README with quick start section for developer onboarding
+- Separate API reference, architecture, and deployment into distinct docs
+- Include code examples for all major use cases
+- Document environment variables in tables for clarity
+- Fix mypy strict type errors: convert List[Dict] to List[Model] and move pid assignment outside try block
+
+**Codebase Patterns:**
+- Type annotations must include `-> ReturnType` for all FastAPI endpoints to pass mypy strict mode
+- Use `List[Model(**item) for item in list]` pattern when returning global state as Pydantic models
+- Define variables before try/except blocks to avoid "possibly unbound" errors
+---
+
+## 2026-03-04 - US-012
+- Implemented comprehensive integration test suite using pytest
+- Created tests/test_main.py with 25 test cases covering:
+  - Health endpoint tests
+  - Anvil status endpoint tests (running and not running states)
+  - All endpoints when Anvil is not running (proper 400 responses)
+  - Pydantic model validation tests (AnvilConfig, responses, RPC models)
+  - Docker configuration tests (Dockerfile, docker-compose.yml existence)
+  - API validation tests (invalid address format handling)
+  - Documentation completeness tests
+- Added pytest configuration to pyproject.toml
+- Updated requirements.txt with test dependencies (pytest, pytest-asyncio, pytest-cov)
+- All 25 tests pass successfully
+- Typecheck passes with mypy strict mode
+
+**Files changed:**
+- tests/test_main.py (created)
+- requirements.txt (added test dependencies)
+- pyproject.toml (added pytest configuration)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use FastAPI's TestClient for endpoint testing without starting server
+- Test error conditions (not running) don't require actual Anvil instance
+- Pydantic models can be tested independently from HTTP endpoints
+- Use TYPE_CHECKING imports to avoid runtime dependencies in tests
+- Fixtures with module scope are faster than function scope for read-only tests
+
+**Codebase Patterns:**
+- Test file structure: class per endpoint/feature, method per test case
+- Use `Iterator[TestClient]` for generator-based fixtures with proper type annotations
+- Test both success and error paths for each endpoint
+- Validate Pydantic models directly for unit testing
+---

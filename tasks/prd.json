@@ -173,6 +173,42 @@
         "path": "/anvil/contracts"
       },
       "passes": true
+    },
+    {
+      "id": "US-011",
+      "title": "Project documentation",
+      "description": "As a developer, I want comprehensive project documentation so I can understand how to use and deploy Lenina.",
+      "acceptanceCriteria": [
+        "README.md created in project root with project overview, quick start guide, API endpoints reference, configuration options",
+        "/docs folder created with detailed documentation",
+        "README.md links to /docs for extended documentation",
+        "Docker setup instructions included",
+        "API usage examples for all endpoints"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-012",
+      "title": "Integration tests for all endpoints",
+      "description": "As a developer, I want comprehensive integration tests so I can verify all API endpoints work correctly and catch regressions.",
+      "acceptanceCriteria": [
+        "Test suite created using pytest with async support",
+        "Tests for /anvil/start endpoint (success, already running, failure cases)",
+        "Tests for /anvil/stop endpoint (success, not running cases)",
+        "Tests for /anvil/restart endpoint (with/without config changes)",
+        "Tests for /anvil/keys endpoint (returns 10+ accounts, not running case)",
+        "Tests for /anvil/contract/:address endpoint (contract exists, not exists, not running)",
+        "Tests for /anvil/config endpoint (returns all config fields, not running)",
+        "Tests for /anvil/status endpoint (running and not running states)",
+        "Tests for /anvil/rpc endpoint (proxy requests, not running)",
+        "Tests for /anvil/contracts endpoint (list contracts, not running)",
+        "Tests for /health endpoint",
+        "Lifecycle integration test (start → status → keys → rpc → stop flow)",
+        "Docker container test (build and run integration tests in container)",
+        "All tests pass with >90% code coverage",
+        "Typecheck passes"
+      ],
+      "passes": true
     }
   ],
   "functionalRequirements": [

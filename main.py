@@ -210,7 +210,7 @@ async def list_contracts() -> ContractsListResponse:
         )
 
     return ContractsListResponse(
-        contracts=deployed_contracts
+        contracts=[ContractInfo(**c) for c in deployed_contracts]
     )
 
 
@@ -430,10 +430,10 @@ async def stop_anvil() -> AnvilStopResponse:
             detail="No Anvil instance is running"
         )
 
+    pid = anvil_process.pid  # Get pid before any operations
+
     try:
         # Get process group for clean termination
-        pid = anvil_process.pid
-
         if os.name != "nt":
             # Unix: kill the process group
             os.killpg(os.getpgid(pid), signal.SIGTERM)

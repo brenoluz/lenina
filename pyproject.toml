@@ -5,6 +5,20 @@ warn_return_any = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--strict-config",
+]
+testpaths = [
+    "tests",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

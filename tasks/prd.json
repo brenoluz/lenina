@@ -171,7 +171,8 @@
       "endpoint": {
         "method": "GET",
         "path": "/anvil/contracts"
-      }
+      },
+      "passes": true
     }
   ],
   "functionalRequirements": [

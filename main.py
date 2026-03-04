@@ -80,6 +80,11 @@ class ContractInfo(BaseModel):
     abi: Optional[Dict[str, Any]] = None
 
 
+class ContractsListResponse(BaseModel):
+    """Response from listing deployed contracts"""
+    contracts: List[ContractInfo]
+
+
 class ContractDetailsResponse(BaseModel):
     """Response from checking contract at address"""
     address: str
@@ -185,6 +190,27 @@ async def get_private_keys() -> AnvilKeysResponse:
     return AnvilKeysResponse(
         accounts=anvil_accounts,
         mnemonic=anvil_config.get("mnemonic") if anvil_config else None
+    )
+
+
+@app.get("/anvil/contracts", response_model=ContractsListResponse)
+async def list_contracts() -> ContractsListResponse:
+    """
+    List all deployed contracts.
+
+    Response includes: address, deploymentBlock, bytecodeHash for each.
+    Contracts tracked from session start or persistence if configured.
+    Returns 400 if Anvil is not running.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anvil instance is running"
+        )
+
+    return ContractsListResponse(
+        contracts=deployed_contracts
     )
 
 

@@ -333,6 +333,8 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
         cmd.extend(["--mnemonic", mnemonic])
 
     try:
+        import fcntl
+        
         # Start Anvil process
         anvil_process = subprocess.Popen(
             cmd,
@@ -341,6 +343,11 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
             text=True,
             preexec_fn=os.setsid if os.name != "nt" else None
         )
+        
+        # Set stdout to non-blocking mode
+        if anvil_process.stdout and os.name != "nt":
+            flags = fcntl.fcntl(anvil_process.stdout.fileno(), fcntl.F_GETFL)
+            fcntl.fcntl(anvil_process.stdout.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
         # Wait a moment for Anvil to start and read output
         await asyncio.sleep(0.5)
@@ -348,22 +355,25 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
         # Check if process is still running
         if anvil_process.poll() is not None:
             # Process failed to start
-            stderr_output = anvil_process.stderr.read() if anvil_process.stderr else ""
+            output = ""
+            try:
+                if anvil_process.stdout:
+                    output = anvil_process.stdout.read()
+            except Exception:
+                pass
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to start Anvil: {stderr_output}"
+                detail=f"Failed to start Anvil: {output}"
             )
 
         # Parse Anvil's output to extract private keys and addresses
-        # Anvil outputs account info in format:
-        # Available Accounts
-        # ==================
-        # (0) 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (10000 ETH)
-        #
-        # Private Keys
-        # ==================
-        # (0) 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-        output = anvil_process.stdout.read(8192) if anvil_process.stdout else ""
+        # Read available output in non-blocking mode
+        output = ""
+        if anvil_process.stdout:
+            try:
+                output = anvil_process.stdout.read(8192) or ""
+            except BlockingIOError:
+                output = ""
 
         # Parse addresses and private keys using regex
         address_pattern = r"\((\d+)\)\s+(0x[0-9a-fA-F]+)\s+\("
@@ -626,25 +636,43 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
         cmd.extend(["--mnemonic", mnemonic])
 
     try:
+        import fcntl
+        
         anvil_process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
             preexec_fn=os.setsid if os.name != "nt" else None
         )
+        
+        # Set stdout to non-blocking mode
+        if anvil_process.stdout and os.name != "nt":
+            flags = fcntl.fcntl(anvil_process.stdout.fileno(), fcntl.F_GETFL)
+            fcntl.fcntl(anvil_process.stdout.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
         await asyncio.sleep(0.5)
 
         if anvil_process.poll() is not None:
-            stderr_output = anvil_process.stderr.read() if anvil_process.stderr else ""
+            output = ""
+            try:
+                if anvil_process.stdout:
+                    output = anvil_process.stdout.read()
+            except Exception:
+                pass
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to start Anvil: {stderr_output}"
+                detail=f"Failed to start Anvil: {output}"
             )
 
         # Parse Anvil's output to extract private keys and addresses
-        output = anvil_process.stdout.read(8192) if anvil_process.stdout else ""
+        # Read available output in non-blocking mode
+        output = ""
+        if anvil_process.stdout:
+            try:
+                output = anvil_process.stdout.read(8192) or ""
+            except BlockingIOError:
+                output = ""
 
         # Parse addresses and private keys using regex
         address_pattern = r"\((\d+)\)\s+(0x[0-9a-fA-F]+)\s+\("

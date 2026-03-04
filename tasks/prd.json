@@ -41,7 +41,8 @@
       "endpoint": {
         "method": "POST",
         "path": "/anvil/stop"
-      }
+      },
+      "passes": true
     },
     {
       "id": "US-003",

@@ -77,7 +77,7 @@ class ContractInfo(BaseModel):
     address: str
     bytecodeHash: str
     deploymentBlock: int
-    abi: Optional[Dict] = None
+    abi: Optional[Dict[str, Any]] = None
 
 
 class ContractDetailsResponse(BaseModel):
@@ -116,7 +116,7 @@ class RpcResponse(BaseModel):
 
 
 # Global state
-anvil_process: Optional[subprocess.Popen] = None
+anvil_process: Optional[subprocess.Popen[Any]] = None
 anvil_start_time: Optional[float] = None
 anvil_config: Optional[Dict[str, Any]] = None
 anvil_accounts: List[PrivateKeyInfo] = []
@@ -124,13 +124,13 @@ deployed_contracts: List[Dict[str, Any]] = []
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, str]:
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 
 @app.get("/anvil/config", response_model=AnvilConfigResponse)
-async def get_config():
+async def get_config() -> AnvilConfigResponse:
     """
     Get Anvil configuration.
 
@@ -162,7 +162,7 @@ async def get_config():
 
 
 @app.get("/anvil/keys", response_model=AnvilKeysResponse)
-async def get_private_keys():
+async def get_private_keys() -> AnvilKeysResponse:
     """
     Retrieve Anvil's generated private keys and addresses.
 
@@ -189,7 +189,7 @@ async def get_private_keys():
 
 
 @app.get("/anvil/contract/{address}", response_model=ContractDetailsResponse)
-async def get_contract(address: str = Path(..., description="Contract address to check")):
+async def get_contract(address: str = Path(..., description="Contract address to check")) -> ContractDetailsResponse:
     """
     Check if a contract exists at the specified address.
 
@@ -268,7 +268,7 @@ async def get_contract(address: str = Path(..., description="Contract address to
 
 
 @app.post("/anvil/start", response_model=AnvilStartResponse)
-async def start_anvil(config: Optional[AnvilConfig] = None):
+async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartResponse:
     """
     Start an Anvil instance with optional configuration.
 
@@ -388,7 +388,7 @@ async def start_anvil(config: Optional[AnvilConfig] = None):
 
 
 @app.post("/anvil/stop", response_model=AnvilStopResponse)
-async def stop_anvil():
+async def stop_anvil() -> AnvilStopResponse:
     """
     Stop a running Anvil instance.
 
@@ -432,9 +432,11 @@ async def stop_anvil():
     except subprocess.TimeoutExpired:
         # Force kill if graceful shutdown fails
         if os.name != "nt":
-            os.killpg(os.getpgid(anvil_process.pid), signal.SIGKILL)
+            os.killpg(os.getpgid(pid), signal.SIGKILL)
         else:
-            anvil_process.kill()
+            # anvil_process is guaranteed to not be None here
+            if anvil_process is not None:
+                anvil_process.kill()
 
         anvil_process = None
         anvil_start_time = None
@@ -462,9 +464,7 @@ async def get_anvil_status() -> AnvilStatus:
     Returns 200 regardless of running state.
     """
     # Check if Anvil is running
-    is_running = anvil_process is not None and anvil_process.poll() is None
-
-    if is_running:
+    if anvil_process is not None and anvil_process.poll() is None:
         uptime = time.time() - anvil_start_time if anvil_start_time else None
         return AnvilStatus(
             running=True,
@@ -536,7 +536,7 @@ async def proxy_rpc(request: RpcRequest) -> RpcResponse:
 
 
 @app.post("/anvil/restart", response_model=AnvilRestartResponse)
-async def restart_anvil(config: Optional[AnvilConfig] = None):
+async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartResponse:
     """
     Restart a running Anvil instance.
 

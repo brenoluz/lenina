@@ -154,7 +154,8 @@
         "docker-compose.yml for easy local development",
         "Container health check endpoint",
         "Typecheck passes"
-      ]
+      ],
+      "passes": true
     },
     {
       "id": "US-010",

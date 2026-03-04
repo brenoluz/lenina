@@ -142,3 +142,23 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - Always return 200 for status endpoints - the `running` field indicates state
 ---
 
+## 2026-03-04 11:03 - US-008
+- Implemented POST `/anvil/rpc` endpoint for proxying JSON-RPC requests to Anvil
+- Created RpcRequest and RpcResponse Pydantic models for JSON-RPC 2.0 format
+- Endpoint forwards requests to Anvil's JSON-RPC endpoint and returns responses
+- Supports standard Ethereum JSON-RPC methods (eth_sendTransaction, eth_call, etc.)
+- Returns 400 if Anvil is not running or on connection errors/timeouts
+- Uses httpx async client for making HTTP requests to Anvil RPC
+
+**Files changed:**
+- main.py (added RpcRequest, RpcResponse models and proxy_rpc endpoint)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use `httpx.AsyncClient` with appropriate timeout (30s) for RPC proxy calls
+- JSON-RPC 2.0 requires `jsonrpc`, `method`, `params`, and `id` fields
+- Pass `params or []` to ensure params is never None when forwarding to Anvil
+- Return error field from Anvil's response in the RpcResponse model
+- Typecheck requires `-> RpcResponse` return annotation on the endpoint
+
+---

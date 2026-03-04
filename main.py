@@ -99,6 +99,22 @@ class AnvilConfigResponse(BaseModel):
     mnemonic: Optional[str] = None
 
 
+class RpcRequest(BaseModel):
+    """JSON-RPC request model"""
+    jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
+    method: str = Field(..., description="RPC method name")
+    params: Optional[List[Any]] = Field(default=None, description="RPC method parameters")
+    id: Optional[Any] = Field(default=None, description="Request ID")
+
+
+class RpcResponse(BaseModel):
+    """JSON-RPC response model"""
+    jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
+    result: Optional[Any] = Field(default=None, description="RPC result")
+    error: Optional[Dict[str, Any]] = Field(default=None, description="RPC error if any")
+    id: Optional[Any] = Field(default=None, description="Request ID")
+
+
 # Global state
 anvil_process: Optional[subprocess.Popen] = None
 anvil_start_time: Optional[float] = None
@@ -462,6 +478,60 @@ async def get_anvil_status() -> AnvilStatus:
             pid=None,
             uptime=None,
             port=None
+        )
+
+
+@app.post("/anvil/rpc", response_model=RpcResponse)
+async def proxy_rpc(request: RpcRequest) -> RpcResponse:
+    """
+    Proxy JSON-RPC requests to Anvil.
+
+    Forwards requests to Anvil's JSON-RPC endpoint and returns the response.
+    Supports standard Ethereum JSON-RPC methods (eth_sendTransaction, eth_call, etc.).
+    Returns 400 if Anvil is not running.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anvil instance is running"
+        )
+
+    # Get the Anvil port from config
+    port = anvil_config.get("port", 8545) if anvil_config else 8545
+    rpc_url = f"http://127.0.0.1:{port}"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # Forward the JSON-RPC request to Anvil
+            response = await client.post(
+                rpc_url,
+                json={
+                    "jsonrpc": request.jsonrpc,
+                    "method": request.method,
+                    "params": request.params or [],
+                    "id": request.id
+                },
+                timeout=30.0
+            )
+            result = response.json()
+
+            return RpcResponse(
+                jsonrpc=result.get("jsonrpc", "2.0"),
+                result=result.get("result"),
+                error=result.get("error"),
+                id=result.get("id")
+            )
+
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=400,
+            detail="Timeout connecting to Anvil RPC"
+        )
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to connect to Anvil RPC: {str(e)}"
         )
 
 

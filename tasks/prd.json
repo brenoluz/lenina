@@ -140,7 +140,8 @@
       "endpoint": {
         "method": "POST",
         "path": "/anvil/rpc"
-      }
+      },
+      "passes": true
     },
     {
       "id": "US-009",

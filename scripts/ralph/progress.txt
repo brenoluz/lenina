@@ -1,0 +1,30 @@
+# Ralph Progress Log
+Started: Wed Mar  4 09:18:46 AM CET 2026
+---
+
+## Codebase Patterns
+- Python 3.10+ with FastAPI for REST API endpoints
+- Pydantic models for request/response validation
+- Global state management for Anvil process lifecycle
+- Use `os.setsid` for process group management on Unix systems
+
+## 2026-03-04 - US-001
+- Implemented POST `/anvil/start` endpoint
+- Created FastAPI application with AnvilConfig and AnvilStartResponse models
+- Implemented process lifecycle management with subprocess.Popen
+- Added proper error handling for already running and failed start scenarios
+- Created requirements.txt and pyproject.toml for project configuration
+
+**Files changed:**
+- main.py (created)
+- requirements.txt (created)
+- pyproject.toml (created)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use `os.setsid` with preexec_fn to properly manage child process groups for clean shutdown
+- Store global state (anvil_process, anvil_config, anvil_start_time) at module level
+- Always check `process.poll() is None` to determine if a subprocess is still running
+- Wait briefly after starting Anvil (asyncio.sleep) to catch immediate startup failures
+---
+

@@ -1,0 +1,220 @@
+{
+  "name": "Lenina - Anvil RESTful Management",
+  "description": "Python-based RESTful API for managing Anvil (Foundry's local Ethereum blockchain). Provides programmatic control over Anvil instances including start, stop, restart operations, private key retrieval, contract deployment verification, and configuration inspection.",
+  "goals": [
+    "Provide RESTful API endpoints for all Anvil lifecycle operations",
+    "Enable contract deployment tracking and verification",
+    "Expose Anvil configuration via API (IP, port, version, etc.)",
+    "Support Docker deployment for consistent environments",
+    "No authentication overhead for local development workflows",
+    "Full-featured API including Anvil RPC proxy capabilities"
+  ],
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Start Anvil instance via API",
+      "description": "As a contract developer, I want to start an Anvil instance via REST API so I can spin up a local blockchain on demand.",
+      "acceptanceCriteria": [
+        "POST `/anvil/start` endpoint accepts optional configuration (port, chainId, blockTime, etc.)",
+        "Returns 200 with Anvil process ID and connection details on success",
+        "Returns 400 if Anvil is already running",
+        "Returns 500 if Anvil fails to start",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "POST",
+        "path": "/anvil/start"
+      },
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Stop Anvil instance via API",
+      "description": "As a contract developer, I want to stop a running Anvil instance via REST API so I can cleanly shut down the blockchain.",
+      "acceptanceCriteria": [
+        "POST `/anvil/stop` endpoint stops the running Anvil process",
+        "Returns 200 with confirmation on success",
+        "Returns 400 if no Anvil instance is running",
+        "Gracefully terminates the process",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "POST",
+        "path": "/anvil/stop"
+      }
+    },
+    {
+      "id": "US-003",
+      "title": "Restart Anvil instance via API",
+      "description": "As a contract developer, I want to restart Anvil via REST API so I can reset the blockchain state without manual intervention.",
+      "acceptanceCriteria": [
+        "POST `/anvil/restart` endpoint stops and starts Anvil",
+        "Preserves configuration from previous run or accepts new config",
+        "Returns 200 with new process details on success",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "POST",
+        "path": "/anvil/restart"
+      }
+    },
+    {
+      "id": "US-004",
+      "title": "Get private keys via API",
+      "description": "As a contract developer, I want to retrieve Anvil's generated private keys via REST API so I can use them for testing and deployment.",
+      "acceptanceCriteria": [
+        "GET `/anvil/keys` endpoint returns list of private keys and addresses",
+        "Returns 400 if Anvil is not running",
+        "Response includes at least 10 default accounts with private keys",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "GET",
+        "path": "/anvil/keys"
+      }
+    },
+    {
+      "id": "US-005",
+      "title": "Check contract deployment status",
+      "description": "As a contract developer, I want to verify if a contract was deployed at a specific address via REST API so I can validate my deployment scripts.",
+      "acceptanceCriteria": [
+        "GET `/anvil/contract/:address` endpoint checks if contract exists at address",
+        "Returns 200 with contract info (bytecode, ABI if available) if deployed",
+        "Returns 404 if no contract at address",
+        "Returns 400 if Anvil is not running",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "GET",
+        "path": "/anvil/contract/:address"
+      }
+    },
+    {
+      "id": "US-006",
+      "title": "Get Anvil configuration",
+      "description": "As a contract developer, I want to see all Anvil configuration via REST API so I know the current blockchain settings.",
+      "acceptanceCriteria": [
+        "GET `/anvil/config` endpoint returns full configuration",
+        "Response includes: IP, port, chainId, version, blockTime, gasLimit, etc.",
+        "Returns 400 if Anvil is not running",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "GET",
+        "path": "/anvil/config"
+      }
+    },
+    {
+      "id": "US-007",
+      "title": "Get Anvil status",
+      "description": "As a contract developer, I want to check if Anvil is running via REST API so I know the current state before making other calls.",
+      "acceptanceCriteria": [
+        "GET `/anvil/status` endpoint returns running state",
+        "Response includes: running (boolean), pid, uptime, port",
+        "Returns 200 regardless of running state",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "GET",
+        "path": "/anvil/status"
+      }
+    },
+    {
+      "id": "US-008",
+      "title": "Proxy Anvil RPC requests",
+      "description": "As a contract developer, I want to send RPC requests through Lenina so I can interact with the blockchain via the REST API.",
+      "acceptanceCriteria": [
+        "POST `/anvil/rpc` endpoint accepts JSON-RPC requests",
+        "Forwards requests to Anvil's JSON-RPC endpoint",
+        "Returns Anvil's response to client",
+        "Supports standard Ethereum JSON-RPC methods (eth_sendTransaction, eth_call, etc.)",
+        "Returns 400 if Anvil is not running",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "POST",
+        "path": "/anvil/rpc"
+      }
+    },
+    {
+      "id": "US-009",
+      "title": "Docker containerization",
+      "description": "As a contract developer, I want to run Lenina in Docker so I have a consistent environment across machines.",
+      "acceptanceCriteria": [
+        "Dockerfile created with Python runtime",
+        "Anvil (Foundry) installed in container",
+        "Container exposes configurable port (default 8000)",
+        "docker-compose.yml for easy local development",
+        "Container health check endpoint",
+        "Typecheck passes"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "List deployed contracts",
+      "description": "As a contract developer, I want to see all deployed contracts via REST API so I can track my deployment history.",
+      "acceptanceCriteria": [
+        "GET `/anvil/contracts` endpoint returns list of all deployed contracts",
+        "Response includes: address, deploymentBlock, bytecodeHash for each",
+        "Contracts tracked from session start or persistence if configured",
+        "Returns 400 if Anvil is not running",
+        "Typecheck passes"
+      ],
+      "endpoint": {
+        "method": "GET",
+        "path": "/anvil/contracts"
+      }
+    }
+  ],
+  "functionalRequirements": [
+    "FR-1: Implement Flask/FastAPI REST server in Python",
+    "FR-2: Manage Anvil process lifecycle (start/stop/restart)",
+    "FR-3: Parse and expose Anvil's private keys from startup output",
+    "FR-4: Track deployed contracts via RPC event listening or state polling",
+    "FR-5: Expose Anvil configuration via config endpoint",
+    "FR-6: Proxy JSON-RPC requests to Anvil",
+    "FR-7: Build Docker image with Foundry/Anvil pre-installed",
+    "FR-8: Implement health check endpoint at GET `/health`",
+    "FR-9: Support configuration via environment variables",
+    "FR-10: Return proper HTTP status codes (200, 400, 404, 500)"
+  ],
+  "nonGoals": [
+    "No user authentication or authorization (local dev only)",
+    "No persistent storage of contracts across restarts (unless explicitly configured)",
+    "No support for multiple simultaneous Anvil instances",
+    "No WebSocket support for RPC subscriptions",
+    "No GUI or web interface",
+    "No integration with remote testnets or mainnet"
+  ],
+  "designConsiderations": [
+    "Use FastAPI for automatic OpenAPI documentation",
+    "Anvil process managed via Python subprocess module",
+    "Contract tracking via eth_getLogs or deployment transaction monitoring",
+    "Configuration stored in memory, optionally persisted to JSON",
+    "Docker image based on Python slim image with Foundry added"
+  ],
+  "technicalConsiderations": [
+    "Python 3.10+ required",
+    "Foundry/Anvil must be installed in Docker image",
+    "Default port 8000 for Lenina API, default 8545 for Anvil RPC",
+    "Graceful shutdown handling for Anvil process",
+    "Environment variables for all configurable options:",
+    "  - LENINA_PORT: API port (default 8000)",
+    "  - ANVIL_PORT: Anvil RPC port (default 8545)",
+    "  - ANVIL_CHAIN_ID: Chain ID (default 31337)",
+    "  - ANVIL_MNEMONIC: HD wallet mnemonic (optional)"
+  ],
+  "successMetrics": [
+    "All REST endpoints respond in under 100ms (excluding Anvil start time)",
+    "Anvil starts within 2 seconds",
+    "Zero manual intervention needed for start/stop/restart cycles",
+    "Docker container builds and runs without errors",
+    "OpenAPI docs available at `/docs` endpoint"
+  ],
+  "openQuestions": [
+    "Should contract deployments be persisted across Anvil restarts?",
+    "Should we support custom Anvil forks (mainnet/other chain forking)?",
+    "Should we add rate limiting to RPC proxy endpoint?",
+    "Should we support multiple Anvil instances with instance IDs?"
+  ]
+}

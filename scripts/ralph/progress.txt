@@ -7,6 +7,7 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - Pydantic models for request/response validation
 - Global state management for Anvil process lifecycle
 - Use `os.setsid` for process group management on Unix systems
+- Use `os.killpg(os.getpgid(pid), signal.SIGTERM)` for graceful process termination
 
 ## 2026-03-04 - US-001
 - Implemented POST `/anvil/start` endpoint
@@ -26,5 +27,22 @@ Started: Wed Mar  4 09:18:46 AM CET 2026
 - Store global state (anvil_process, anvil_config, anvil_start_time) at module level
 - Always check `process.poll() is None` to determine if a subprocess is still running
 - Wait briefly after starting Anvil (asyncio.sleep) to catch immediate startup failures
+---
+
+## 2026-03-04 - US-002
+- Implemented POST `/anvil/stop` endpoint
+- Created AnvilStopResponse Pydantic model
+- Implemented graceful process termination using SIGTERM for process groups
+- Added fallback to SIGKILL if graceful shutdown times out
+- Properly clears global state after stopping (anvil_process, anvil_start_time, anvil_config)
+
+**Files changed:**
+- main.py (added stop_anvil endpoint and AnvilStopResponse model)
+- tasks/prd.json (updated with passes: true)
+
+**Learnings for future iterations:**
+- Use `os.killpg(os.getpgid(pid), signal.SIGTERM)` for clean process group termination on Unix
+- Always clear global state after stopping to allow clean restart
+- Handle subprocess.TimeoutExpired to force kill if graceful shutdown fails
 ---
 

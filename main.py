@@ -340,6 +340,7 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
         "--port", str(port),
         "--chain-id", str(chain_id),
         "--gas-limit", str(gas_limit),
+        "--host", "0.0.0.0",
     ]
 
     if block_time > 0:
@@ -643,6 +644,7 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
         "--port", str(port),
         "--chain-id", str(chain_id),
         "--gas-limit", str(gas_limit),
+        "--host", "0.0.0.0",
     ]
 
     if block_time > 0:

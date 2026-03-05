@@ -12,6 +12,7 @@ import signal
 import time
 from datetime import datetime
 import httpx
+import socket
 
 app = FastAPI(
     title="Lenina",
@@ -60,16 +61,16 @@ class AnvilRestartResponse(BaseModel):
     message: str
 
 
-class AnvilKeysResponse(BaseModel):
-    """Response from getting private keys"""
-    accounts: List[PrivateKeyInfo]
-    mnemonic: Optional[str] = None
-
-
 class PrivateKeyInfo(BaseModel):
     """Private key and address pair"""
     address: str
     privateKey: str
+
+
+class AnvilKeysResponse(BaseModel):
+    """Response from getting private keys"""
+    accounts: List[PrivateKeyInfo]
+    mnemonic: Optional[str] = None
 
 
 class ContractInfo(BaseModel):
@@ -128,6 +129,21 @@ anvil_accounts: List[PrivateKeyInfo] = []
 deployed_contracts: List[Dict[str, Any]] = []
 
 
+def get_lan_ip() -> str:
+    """Get the LAN IP address of this machine"""
+    host_ip = os.environ.get("HOST_IP")
+    if host_ip:
+        return host_ip
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     """Health check endpoint"""
@@ -156,7 +172,7 @@ async def get_config() -> AnvilConfigResponse:
         )
 
     return AnvilConfigResponse(
-        ip="127.0.0.1",
+        ip=get_lan_ip(),
         port=anvil_config.get("port", 8545),
         chainId=anvil_config.get("chainId", 31337),
         version="0.1.0",

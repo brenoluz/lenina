@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   lenina:
     build:
@@ -19,6 +17,8 @@ services:
       - ANVIL_CHAIN_ID=${ANVIL_CHAIN_ID:-31337}
       - ANVIL_GAS_LIMIT=${ANVIL_GAS_LIMIT:-30000000}
       - ANVIL_MNEMONIC=${ANVIL_MNEMONIC:-}
+      # Host IP for external access
+      - HOST_IP=${HOST_IP:-}
     volumes:
       # Mount local code for development (optional, comment out for production)
       - ./main.py:/app/main.py:ro

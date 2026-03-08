@@ -2,6 +2,7 @@
 Lenina - Anvil RESTful Management API
 """
 from fastapi import FastAPI, HTTPException, Path
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import subprocess
@@ -121,12 +122,30 @@ class RpcResponse(BaseModel):
     id: Optional[Any] = Field(default=None, description="Request ID")
 
 
+class LogEntry(BaseModel):
+    """Single log entry"""
+    line: str
+    timestamp: float
+    sequence: int
+
+
+class AnvilLogsResponse(BaseModel):
+    """Response from getting Anvil logs"""
+    lines: List[LogEntry]
+    totalLines: int
+    truncated: bool
+    format: str = "markdown"
+
+
 # Global state
 anvil_process: Optional[subprocess.Popen[Any]] = None
 anvil_start_time: Optional[float] = None
 anvil_config: Optional[Dict[str, Any]] = None
 anvil_accounts: List[PrivateKeyInfo] = []
 deployed_contracts: List[Dict[str, Any]] = []
+anvil_logs: List[Dict[str, Any]] = []
+anvil_log_sequence: int = 0
+LOG_BUFFER_MAX = 1000
 
 
 def get_lan_ip() -> str:
@@ -142,6 +161,46 @@ def get_lan_ip() -> str:
         return ip
     except Exception:
         return "127.0.0.1"
+
+
+def append_log_line(line: str) -> None:
+    """Append a log line to the circular buffer"""
+    global anvil_logs, anvil_log_sequence
+    
+    anvil_log_sequence += 1
+    anvil_logs.append({
+        "line": line.rstrip(),
+        "timestamp": time.time(),
+        "sequence": anvil_log_sequence
+    })
+    
+    if len(anvil_logs) > LOG_BUFFER_MAX:
+        anvil_logs.pop(0)
+
+
+def format_logs_as_markdown(logs: List[Dict[str, Any]]) -> str:
+    """Format logs as markdown code block"""
+    if not logs:
+        return "```\nNo logs available\n```"
+    
+    formatted = "\n".join(entry["line"] for entry in logs)
+    return f"```\n{formatted}\n```"
+
+
+async def capture_anvil_output():
+    """Continuously capture Anvil stdout in background"""
+    global anvil_process
+    
+    while anvil_process is not None and anvil_process.poll() is None:
+        if anvil_process.stdout:
+            try:
+                output = anvil_process.stdout.read(4096) or ""
+                if output:
+                    for line in output.splitlines():
+                        append_log_line(line)
+            except BlockingIOError:
+                pass
+        await asyncio.sleep(0.1)
 
 
 @app.get("/health")
@@ -389,6 +448,9 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
         if anvil_process.stdout:
             try:
                 output = anvil_process.stdout.read(8192) or ""
+                # Capture initial output to logs
+                for line in output.splitlines():
+                    append_log_line(line)
             except BlockingIOError:
                 output = ""
 
@@ -418,8 +480,9 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
             "mnemonic": mnemonic
         }
 
-        # Reset deployed contracts tracking
         deployed_contracts.clear()
+
+        asyncio.create_task(capture_anvil_output())
 
         return AnvilStartResponse(
             pid=anvil_process.pid,
@@ -441,14 +504,14 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
 
 
 @app.post("/anvil/stop", response_model=AnvilStopResponse)
-async def stop_anvil() -> AnvilStopResponse:
+async def stop_anvil(preserve_logs: bool = False) -> AnvilStopResponse:
     """
     Stop a running Anvil instance.
 
     Returns 400 if no Anvil instance is running.
     Gracefully terminates the process.
     """
-    global anvil_process, anvil_start_time, anvil_config, anvil_accounts
+    global anvil_process, anvil_start_time, anvil_config, anvil_accounts, anvil_logs, anvil_log_sequence
 
     # Check if Anvil is running
     if anvil_process is None or anvil_process.poll() is not None:
@@ -476,6 +539,9 @@ async def stop_anvil() -> AnvilStopResponse:
         anvil_start_time = None
         anvil_config = None
         anvil_accounts.clear()
+        if not preserve_logs:
+            anvil_logs.clear()
+            anvil_log_sequence = 0
 
         return AnvilStopResponse(
             status="stopped",
@@ -495,6 +561,9 @@ async def stop_anvil() -> AnvilStopResponse:
         anvil_start_time = None
         anvil_config = None
         anvil_accounts.clear()
+        if not preserve_logs:
+            anvil_logs.clear()
+            anvil_log_sequence = 0
 
         return AnvilStopResponse(
             status="stopped",
@@ -532,6 +601,92 @@ async def get_anvil_status() -> AnvilStatus:
             uptime=None,
             port=None
         )
+
+
+@app.get("/anvil/logs", response_model=AnvilLogsResponse)
+async def get_anvil_logs(
+    lines: int = 100,
+    since: Optional[int] = None,
+    format: str = "markdown"
+) -> AnvilLogsResponse:
+    """
+    Get Anvil console logs.
+    
+    - **lines**: Number of recent lines (1-1000, default: 100)
+    - **since**: Optional sequence number to get logs after
+    - **format**: Output format - markdown, json, or text
+    
+    Returns logs in circular buffer (max 1000 lines).
+    Returns 400 if no Anvil instance is running.
+    """
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anvil instance is running"
+        )
+    
+    filtered_logs = anvil_logs.copy()
+    
+    if since is not None:
+        filtered_logs = [log for log in filtered_logs if log["sequence"] > since]
+    
+    recent_logs = filtered_logs[-lines:] if lines else filtered_logs
+    
+    return AnvilLogsResponse(
+        lines=[LogEntry(**log) for log in recent_logs],
+        totalLines=len(anvil_logs),
+        truncated=len(recent_logs) < len(filtered_logs),
+        format=format
+    )
+
+
+@app.get("/anvil/logs/stream")
+async def stream_anvil_logs(
+    since: Optional[int] = None,
+    format: str = "markdown"
+):
+    """
+    Stream Anvil logs in real-time using Server-Sent Events (SSE).
+    
+    - **since**: Optional sequence number to start from (default: end of current buffer)
+    - **format**: Output format - markdown or text
+    
+    Returns event stream with new log lines as they arrive.
+    Connection closes when Anvil stops.
+    """
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anvil instance is running"
+        )
+    
+    async def event_generator():
+        last_sequence = since if since is not None else (anvil_log_sequence or 0)
+        
+        while anvil_process is not None and anvil_process.poll() is None:
+            new_logs = [log for log in anvil_logs if log["sequence"] > last_sequence]
+            
+            for log in new_logs:
+                if format == "markdown":
+                    data = f"```\n{log['line']}\n```"
+                else:
+                    data = log["line"]
+                
+                yield f"data: {data}\n\n"
+                last_sequence = log["sequence"]
+            
+            yield f": keepalive\n\n"
+            await asyncio.sleep(0.5)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @app.post("/anvil/rpc", response_model=RpcResponse)
@@ -719,6 +874,8 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
         }
 
         deployed_contracts.clear()
+
+        asyncio.create_task(capture_anvil_output())
 
         return AnvilRestartResponse(
             pid=anvil_process.pid,

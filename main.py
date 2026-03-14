@@ -28,7 +28,15 @@ class AnvilConfig(BaseModel):
     chainId: Optional[int] = Field(default=31337, description="Chain ID")
     blockTime: Optional[int] = Field(default=0, description="Block time in seconds (0 for auto)")
     gasLimit: Optional[int] = Field(default=30000000, description="Gas limit per block")
-    mnemonic: Optional[str] = Field(default=None, description="HD wallet mnemonic")
+    mnemonic: Optional[str] = Field(default=None, description="HD wallet mnemonic (12-24 words)")
+
+    model_config = {'json_schema_extra': {'example': {
+        'port': 8545,
+        'chainId': 31337,
+        'blockTime': 0,
+        'gasLimit': 30000000,
+        'mnemonic': None
+    }}}
 
 
 class AnvilStatus(BaseModel):

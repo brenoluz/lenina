@@ -15,10 +15,33 @@ from datetime import datetime
 import httpx
 import socket
 
+def get_version() -> str:
+    """Get version from package metadata or git"""
+    try:
+        from importlib.metadata import version
+        return version("lenina")
+    except Exception:
+        pass
+    
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    
+    return "unknown"
+
+__version__ = get_version()
+
 app = FastAPI(
     title="Lenina",
     description="RESTful API for managing Anvil (Foundry's local Ethereum blockchain)",
-    version="0.1.0"
+    version=__version__
 )
 
 
@@ -262,7 +285,7 @@ async def get_avnil_config() -> AnvilConfigResponse:
         ip=get_lan_ip(),
         port=anvil_config.get("port", 8545),
         chainId=anvil_config.get("chainId", 31337),
-        version="0.1.0",
+        version=__version__,
         blockTime=anvil_config.get("blockTime", 0),
         gasLimit=anvil_config.get("gasLimit", 30000000),
         mnemonic=anvil_config.get("mnemonic")

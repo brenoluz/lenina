@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/brenoluz/lenina)](https://hub.docker.com/r/brenoluz/lenina)
+[![Docker Image Version](https://img.shields.io/docker/v/brenoluz/lenina/latest)](https://hub.docker.com/r/brenoluz/lenina/tags)
 
 Lenina is a Python-based RESTful API for managing Anvil (Foundry's local Ethereum blockchain). It provides programmatic control over Anvil instances including start, stop, restart operations, private key retrieval, contract deployment verification, and configuration inspection.
 
@@ -10,35 +12,43 @@ Lenina is a Python-based RESTful API for managing Anvil (Foundry's local Ethereu
 
 - 🚀 **Full Anvil Lifecycle Management** - Start, stop, and restart Anvil instances via REST API
 - 🔑 **Private Key Access** - Retrieve all generated private keys and addresses programmatically
-- 📋 **Contract Tracking** - Verify contract deployments and list all deployed contracts
+- 📋 **Automatic Contract Tracking** - Auto-detect contracts deployed via any method (RPC, Foundry, web3.py, etc.)
 - ⚙️ **Configuration Exposure** - Get all Anvil configuration settings via API
 - 🔄 **RPC Proxy** - Forward JSON-RPC requests to Anvil through the REST API
-- 🐳 **Docker Ready** - Fully containerized with Docker and docker-compose support
+- 📝 **Real-time Logs** - Stream Anvil logs via SSE or retrieve recent entries
+- 🐳 **Docker Ready** - Official Docker image available at `brenoluz/lenina`
 - 📖 **Auto-Generated Docs** - OpenAPI documentation available at `/docs`
 
 ## Quick Start
 
 ### Using Docker (Recommended)
 
-1. **Start Lenina with docker-compose:**
+**Option 1: Pull from Docker Hub**
+
+```bash
+docker pull brenoluz/lenina:v0.1.0
+docker run -d -p 8000:8000 -p 8545:8545 --name lenina brenoluz/lenina:v0.1.0
+```
+
+**Option 2: Use docker-compose**
 
 ```bash
 docker-compose up -d
 ```
 
-2. **Verify it's running:**
+**Verify it's running:**
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-3. **Start Anvil:**
+**Start Anvil:**
 
 ```bash
 curl -X POST http://localhost:8000/anvil/start
 ```
 
-4. **Access API docs:** Open http://localhost:8000/docs in your browser
+**Access API docs:** Open http://localhost:8000/docs in your browser
 
 ### Local Setup
 
@@ -268,7 +278,7 @@ GET /anvil/contracts
       "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
       "bytecodeHash": "0xabc123...",
       "deploymentBlock": 1,
-      "abi": {}
+      "abi": null
     }
   ]
 }
@@ -307,6 +317,53 @@ Content-Type: application/json
 - `eth_getLogs` - Get event logs
 - And all other standard Ethereum JSON-RPC methods
 
+### Get Anvil Logs
+
+```http
+GET /anvil/logs?lines=100&since=0&format=markdown
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `lines` | integer | `100` | Number of recent lines (1-1000) |
+| `since` | integer | `null` | Get logs after this sequence number |
+| `format` | string | `markdown` | Output format: `markdown`, `json`, or `text` |
+
+**Response:**
+```json
+{
+  "lines": [
+    {
+      "line": "Listening on 127.0.0.1:8545",
+      "timestamp": 1709547000.123,
+      "sequence": 1
+    }
+  ],
+  "totalLines": 50,
+  "truncated": false,
+  "format": "markdown"
+}
+```
+
+### Stream Logs (Server-Sent Events)
+
+```http
+GET /anvil/logs/stream?since=0&format=text
+```
+
+**Description:** Real-time log streaming via SSE. Connection stays open while Anvil runs.
+
+**Example:**
+```bash
+# Stream logs in terminal
+curl -N http://localhost:8000/anvil/logs/stream
+
+# Get logs after sequence 100
+curl -N http://localhost:8000/anvil/logs/stream?since=100
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -339,8 +396,8 @@ services:
 ### Complete Workflow
 
 ```bash
-# 1. Start Lenina
-python main.py &
+# 1. Start Lenina (using Docker)
+docker run -d -p 8000:8000 -p 8545:8545 --name lenina brenoluz/lenina:v0.1.0
 
 # 2. Start Anvil
 curl -X POST http://localhost:8000/anvil/start
@@ -359,7 +416,13 @@ curl -X POST http://localhost:8000/anvil/rpc \
 # 6. Check contract deployment
 curl http://localhost:8000/anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3
 
-# 7. Stop Anvil
+# 7. Get recent logs
+curl http://localhost:8000/anvil/logs?lines=30
+
+# 8. Stream logs
+curl -N http://localhost:8000/anvil/logs/stream
+
+# 9. Stop Anvil
 curl -X POST http://localhost:8000/anvil/stop
 ```
 
@@ -400,10 +463,10 @@ const contract = await factory.deploy();
 
 ## Docker
 
-### Build Image
+### Pull from Docker Hub (Recommended)
 
 ```bash
-docker build -t lenina .
+docker pull brenoluz/lenina:v0.1.0
 ```
 
 ### Run Container
@@ -413,7 +476,13 @@ docker run -d \
   -p 8000:8000 \
   -p 8545:8545 \
   --name lenina \
-  lenina
+  brenoluz/lenina:v0.1.0
+```
+
+### Build Image Locally
+
+```bash
+docker build -t lenina .
 ```
 
 ### Docker Compose
@@ -478,12 +547,19 @@ lenina/
 │   Client    │────▶│   Lenina     │────▶│  Anvil   │
 │  (REST/HTTP)│     │  (FastAPI)   │     │(Foundry) │
 └─────────────┘     └──────────────┘     └──────────┘
+                           │                   │
+                           │◀─────stdout───────│
+                           ▼             (log capture)
+                     ┌──────────────┐
+                     │   Process    │
+                     │  Management  │
+                     └──────────────┘
                            │
                            ▼
-                    ┌──────────────┐
-                    │   Process    │
-                    │  Management  │
-                    └──────────────┘
+                     ┌──────────────┐
+                     │  Log Buffer  │
+                     │  (circular)  │
+                     └──────────────┘
 ```
 
 - **FastAPI** handles REST endpoints and OpenAPI documentation
@@ -523,6 +599,16 @@ export LENINA_PORT=8001
 ```bash
 docker-compose logs lenina
 ```
+
+### Swagger UI Shows "string" for Mnemonic
+
+```
+Error: the word `string` is invalid
+```
+
+**Cause:** Swagger UI auto-fills string fields with `"string"` placeholder, which Anvil rejects.
+
+**Solution:** Delete the mnemonic value in Swagger UI (leave empty) or use a valid 12-24 word mnemonic phrase.
 
 ## Contributing
 

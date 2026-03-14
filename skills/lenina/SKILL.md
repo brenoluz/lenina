@@ -7,11 +7,46 @@ description: How to use the Lenina project (Anvil REST API management) using cur
 
 This skill provides complete workflow-style guidance for using the Lenina REST API with curl commands. Designed for users familiar with curl but new to blockchain/Anvil concepts.
 
+## Installation
+
+### Using Docker Hub (Recommended)
+
+```bash
+# Pull the official image
+docker pull brenoluz/lenina:v0.1.0
+
+# Run the container
+docker run -d -p 8000:8000 -p 8545:8545 --name lenina brenoluz/lenina:v0.1.0
+
+# Verify it's running
+curl http://localhost:8000/health
+```
+
+### Using Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+### Local Development
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the server
+python main.py
+```
+
 ## Quick Reference
 
 **Base URL:** Use the `LENINA_BASE_URL` environment variable. If not set, test `http://localhost:8000` with a health check request. If that fails, ask the user for the correct Lenina URL and port. Once you discover the correct URL, save it to a `.env` file in the project root as `LENINA_BASE_URL=<url>` if one doesn't exist.
 
 **Anvil RPC URL:** `http://localhost:8545` (default Anvil port, exposed by Lenina)
+
+**Docker Image:** `brenoluz/lenina:v0.1.0` (available on Docker Hub)
+
+**GitHub:** https://github.com/brenoluz/lenina
 
 ---
 
@@ -220,7 +255,7 @@ curl $LENINA_BASE_URL/anvil/config
   "ip": "127.0.0.1",
   "port": 8545,
   "chainId": 31337,
-  "version": "0.1.0",
+  "version": "v0.1.0",
   "blockTime": 0,
   "gasLimit": 30000000,
   "mnemonic": "test test test test test test test test test test test junk"
@@ -624,3 +659,10 @@ After mastering curl commands, you might want to:
 2. **Use with ethers.js:** Create a provider with `new ethers.JsonRpcProvider("http://localhost:8545")`
 3. **Use with Foundry tools:** Run `forge test --rpc-url http://localhost:8545`
 4. **Explore OpenAPI docs:** Visit `$LENINA_BASE_URL/docs` for interactive API documentation
+
+## Resources
+
+- **Docker Hub:** https://hub.docker.com/r/brenoluz/lenina
+- **GitHub:** https://github.com/brenoluz/lenina
+- **API Docs:** `http://localhost:8000/docs`
+- **Changelog:** https://github.com/brenoluz/lenina/blob/main/CHANGELOG.md

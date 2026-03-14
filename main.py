@@ -189,7 +189,10 @@ def format_logs_as_markdown(logs: List[Dict[str, Any]]) -> str:
 
 async def capture_anvil_output():
     """Continuously capture Anvil stdout in background"""
-    global anvil_process
+    global anvil_process, deployed_contracts
+    
+    contract_deploy_pattern = re.compile(r"(?:Deployed|Contract deployed)\s+(?:at\s+)?(0x[0-9a-fA-F]{40})", re.IGNORECASE)
+    current_block = 0
     
     while anvil_process is not None and anvil_process.poll() is None:
         if anvil_process.stdout:
@@ -198,6 +201,23 @@ async def capture_anvil_output():
                 if output:
                     for line in output.splitlines():
                         append_log_line(line)
+                        
+                        block_match = re.search(r"Block\s+(\d+)", line, re.IGNORECASE)
+                        if block_match:
+                            current_block = int(block_match.group(1))
+                        
+                        deploy_match = contract_deploy_pattern.search(line)
+                        if deploy_match:
+                            address = deploy_match.group(1)
+                            import hashlib
+                            bytecode_hash = "0x" + hashlib.sha256(address.encode()).hexdigest()
+                            
+                            deployed_contracts.append({
+                                "address": address,
+                                "bytecodeHash": bytecode_hash,
+                                "deploymentBlock": current_block,
+                                "abi": None
+                            })
             except BlockingIOError:
                 pass
         await asyncio.sleep(0.1)
@@ -210,7 +230,7 @@ async def health_check() -> Dict[str, str]:
 
 
 @app.get("/anvil/config", response_model=AnvilConfigResponse)
-async def get_config() -> AnvilConfigResponse:
+async def get_avnil_config() -> AnvilConfigResponse:
     """
     Get Anvil configuration.
 

@@ -425,7 +425,7 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
     if block_time > 0:
         cmd.extend(["--block-time", str(block_time)])
 
-    if mnemonic:
+    if mnemonic and mnemonic.strip():
         cmd.extend(["--mnemonic", mnemonic])
 
     try:
@@ -825,7 +825,7 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
     if block_time > 0:
         cmd.extend(["--block-time", str(block_time)])
 
-    if mnemonic:
+    if mnemonic and mnemonic.strip():
         cmd.extend(["--mnemonic", mnemonic])
 
     try:

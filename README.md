@@ -543,3 +543,80 @@ For more detailed documentation, see the [`/docs`](./docs/) folder:
 - [API Reference](./docs/api.md) - Complete API documentation
 - [Architecture](./docs/architecture.md) - System design and architecture
 - [Deployment](./docs/deployment.md) - Production deployment guide
+
+## AI Skills
+
+Lenina includes a skill for AI coding assistants that provides comprehensive curl-based usage examples.
+
+### Installation
+
+#### Claude Desktop (claude.ai)
+
+1. Open Claude Desktop settings
+2. Navigate to the Skills section
+3. Click "Add Skill" and select the `skills/lenina` folder from this repository
+
+Alternatively, copy the `skills/lenina` folder to your skills directory:
+
+- **macOS:** `~/Library/Application Support/Claude/skills/lenina`
+- **Linux:** `~/.config/claude/skills/lenina`
+- **Windows:** `%APPDATA%\Claude\skills\lenina`
+
+#### OpenCode
+
+OpenCode automatically loads skills from the `.claude/skills/` folder in your project.
+
+Copy the skill to your project:
+
+```bash
+mkdir -p .claude/skills
+cp -r skills/lenina .claude/skills/
+```
+
+Or create a symlink:
+
+```bash
+mkdir -p .claude/skills
+ln -s ../skills/lenina .claude/skills/lenina
+```
+
+#### GitHub Copilot (Codex)
+
+For GitHub Copilot users using the Copilot CLI or VS Code extension:
+
+1. Create a `.github/copilot-instructions.md` file in your project
+2. Add the following content:
+
+```markdown
+# Lenina Project - Curl Usage
+
+This project includes a comprehensive skill for using Lenina with curl.
+Reference: `skills/lenina/SKILL.md`
+
+When asked about curl commands, API usage, or HTTP requests for Lenina,
+provide examples based on the workflow patterns in the skill file.
+```
+
+3. Copilot will use these instructions when providing assistance
+
+#### Cursor
+
+1. Open Cursor settings (⌘+, or Ctrl+,)
+2. Go to the "Features" tab
+3. Scroll to "Skills" or "AI Instructions"
+4. Click "Add Skill" and point to the `skills/lenina` folder
+
+#### Generic Setup (Any AI Assistant)
+
+If your AI assistant supports custom skills or instructions, copy the `skills/lenina/SKILL.md` file to your assistant's skill/instruction directory.
+
+### Usage
+
+Once installed, you can ask your AI assistant questions like:
+
+- "How do I start Anvil using curl?"
+- "Show me how to send ETH using the Lenina API"
+- "What's the curl command to get my private keys?"
+- "How do I deploy a contract using curl requests?"
+
+The skill provides workflow-style examples for all Lenina API operations.

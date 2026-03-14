@@ -9,9 +9,63 @@ This skill provides complete workflow-style guidance for using the Lenina REST A
 
 ## Quick Reference
 
-**Base URL:** `http://localhost:8000` (default Lenina port)
+**Base URL:** Use the `LENINA_BASE_URL` environment variable. If not set, test `http://localhost:8000` with a health check request. If that fails, ask the user for the correct Lenina URL and port. Once you discover the correct URL, save it to a `.env` file in the project root as `LENINA_BASE_URL=<url>` if one doesn't exist.
 
 **Anvil RPC URL:** `http://localhost:8545` (default Anvil port, exposed by Lenina)
+
+---
+
+## Environment Setup
+
+### Determine Base URL
+
+Before using the API, determine the correct Lenina base URL:
+
+```bash
+# 1. Check if LENINA_BASE_URL is set
+echo $LENINA_BASE_URL
+
+# 2. If empty, test default
+curl http://localhost:8000/health
+
+# 3. If that fails, ask user for the correct URL
+
+# 4. Once found, save to .env file (if not already set):
+echo "LENINA_BASE_URL=<discovered-url>" >> .env
+
+# 5. Export for current session:
+export LENINA_BASE_URL=<discovered-url>
+```
+
+**Note:** Always use `$LENINA_BASE_URL` in curl commands after determining the correct URL.
+
+### Alternative: Connect Directly to Anvil
+
+If you already have an Anvil instance running, you can connect directly to it and get its configuration:
+
+```bash
+# Get Anvil config to find the correct URL
+curl $LENINA_BASE_URL/anvil/config
+```
+
+**Response:**
+```json
+{
+  "ip": "127.0.0.1",
+  "port": 8545,
+  "chainId": 31337,
+  ...
+}
+```
+
+From this response, you can determine:
+- **Anvil RPC URL:** `http://<ip>:<port>` (e.g., `http://127.0.0.1:8545`)
+- Use this URL for direct JSON-RPC calls to Anvil
+
+This is useful when:
+- Anvil is running on a non-default port
+- You want to bypass Lenina and talk directly to Anvil
+- You need to verify which port Anvil is listening on
 
 ---
 
@@ -20,7 +74,7 @@ This skill provides complete workflow-style guidance for using the Lenina REST A
 ### Step 1: Check if Lenina is running
 
 ```bash
-curl http://localhost:8000/health
+curl $LENINA_BASE_URL/health
 ```
 
 **Expected response:**
@@ -31,10 +85,9 @@ curl http://localhost:8000/health
 }
 ```
 
-**If you get an error:** Lenina is not running. Start it with:
+**If you get an error:** Ask the user for the correct Lenina URL and port, then save it to `.env`:
 ```bash
-python main.py
-# Or use Docker: docker-compose up -d
+echo "LENINA_BASE_URL=<user-provided-url>" >> .env
 ```
 
 ### Step 2: Start Anvil (the local blockchain)
@@ -42,7 +95,7 @@ python main.py
 **What is Anvil?** Anvil is a local Ethereum blockchain used for development and testing. It's like a sandbox blockchain that runs on your computer.
 
 ```bash
-curl -X POST http://localhost:8000/anvil/start
+curl -X POST $LENINA_BASE_URL/anvil/start
 ```
 
 **Expected response:**
@@ -64,7 +117,7 @@ curl -X POST http://localhost:8000/anvil/start
 ### Step 3: Verify Anvil is running
 
 ```bash
-curl http://localhost:8000/anvil/status
+curl $LENINA_BASE_URL/anvil/status
 ```
 
 **Response:**
@@ -84,7 +137,7 @@ curl http://localhost:8000/anvil/status
 ### Start with custom chain ID and port
 
 ```bash
-curl -X POST http://localhost:8000/anvil/start \
+curl -X POST $LENINA_BASE_URL/anvil/start \
   -H "Content-Type: application/json" \
   -d '{
     "port": 8546,
@@ -107,7 +160,7 @@ curl -X POST http://localhost:8000/anvil/start \
 ### Start with a specific mnemonic (for consistent addresses)
 
 ```bash
-curl -X POST http://localhost:8000/anvil/start \
+curl -X POST $LENINA_BASE_URL/anvil/start \
   -H "Content-Type: application/json" \
   -d '{
     "mnemonic": "my secure mnemonic phrase here"
@@ -123,7 +176,7 @@ curl -X POST http://localhost:8000/anvil/start \
 ### Retrieve all generated accounts
 
 ```bash
-curl http://localhost:8000/anvil/keys
+curl $LENINA_BASE_URL/anvil/keys
 ```
 
 **Response:**
@@ -158,7 +211,7 @@ curl http://localhost:8000/anvil/keys
 ### Check Anvil settings
 
 ```bash
-curl http://localhost:8000/anvil/config
+curl $LENINA_BASE_URL/anvil/config
 ```
 
 **Response:**
@@ -181,7 +234,7 @@ curl http://localhost:8000/anvil/config
 ### Stop Anvil
 
 ```bash
-curl -X POST http://localhost:8000/anvil/stop
+curl -X POST $LENINA_BASE_URL/anvil/stop
 ```
 
 **Response:**
@@ -195,7 +248,7 @@ curl -X POST http://localhost:8000/anvil/stop
 ### Restart with new configuration
 
 ```bash
-curl -X POST http://localhost:8000/anvil/restart \
+curl -X POST $LENINA_BASE_URL/anvil/restart \
   -H "Content-Type: application/json" \
   -d '{
     "chainId": 1337,
@@ -214,7 +267,7 @@ curl -X POST http://localhost:8000/anvil/restart \
 ### Get current block number
 
 ```bash
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -238,7 +291,7 @@ curl -X POST http://localhost:8000/anvil/rpc \
 ### Get account balance
 
 ```bash
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -262,7 +315,7 @@ curl -X POST http://localhost:8000/anvil/rpc \
 ### Get accounts list
 
 ```bash
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -275,7 +328,7 @@ curl -X POST http://localhost:8000/anvil/rpc \
 ### Send ETH between accounts
 
 ```bash
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -321,7 +374,7 @@ curl -X POST http://localhost:8000/anvil/rpc \
 ### List all deployed contracts
 
 ```bash
-curl http://localhost:8000/anvil/contracts
+curl $LENINA_BASE_URL/anvil/contracts
 ```
 
 **Response:**
@@ -341,7 +394,7 @@ curl http://localhost:8000/anvil/contracts
 ### Check if a specific address has a contract
 
 ```bash
-curl http://localhost:8000/anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3
+curl $LENINA_BASE_URL/anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3
 ```
 
 **Response (contract exists):**
@@ -369,16 +422,16 @@ curl http://localhost:8000/anvil/contract/0x5FbDB2315678afecb367f032d93F642f6418
 
 ```bash
 # 1. Check Lenina health
-curl http://localhost:8000/health
+curl $LENINA_BASE_URL/health
 
 # 2. Start Anvil with default settings
-curl -X POST http://localhost:8000/anvil/start
+curl -X POST $LENINA_BASE_URL/anvil/start
 
 # 3. Get the accounts and private keys
-curl http://localhost:8000/anvil/keys | jq .accounts[0]
+curl $LENINA_BASE_URL/anvil/keys | jq .accounts[0]
 
 # 4. Check the balance of the first account
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -388,12 +441,12 @@ curl -X POST http://localhost:8000/anvil/rpc \
   }'
 
 # 5. Get current block number
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
 # 6. Send some ETH to another account
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -407,15 +460,15 @@ curl -X POST http://localhost:8000/anvil/rpc \
   }'
 
 # 7. Verify the transaction by checking block number (should have increased)
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
 # 8. List any deployed contracts
-curl http://localhost:8000/anvil/contracts
+curl $LENINA_BASE_URL/anvil/contracts
 
 # 9. When done, stop Anvil
-curl -X POST http://localhost:8000/anvil/stop
+curl -X POST $LENINA_BASE_URL/anvil/stop
 ```
 
 ---
@@ -426,12 +479,12 @@ curl -X POST http://localhost:8000/anvil/stop
 
 ```bash
 # First, start Anvil with blockTime: 0 (auto-mine is default)
-curl -X POST http://localhost:8000/anvil/start \
+curl -X POST $LENINA_BASE_URL/anvil/start \
   -H "Content-Type: application/json" \
   -d '{"blockTime": 0}'
 
 # Mine a block manually using RPC
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"evm_mine","params":[],"id":1}'
 ```
@@ -440,7 +493,7 @@ curl -X POST http://localhost:8000/anvil/rpc \
 
 ```bash
 # Mine a block every 5 seconds
-curl -X POST http://localhost:8000/anvil/start \
+curl -X POST $LENINA_BASE_URL/anvil/start \
   -H "Content-Type: application/json" \
   -d '{"blockTime": 5}'
 ```
@@ -455,10 +508,12 @@ curl -X POST http://localhost:8000/anvil/start \
 curl: (7) Failed to connect to localhost port 8000
 ```
 
-**Solution:** Lenina is not running. Start it:
+**Solution:** 
+1. Check if `LENINA_BASE_URL` environment variable is set and use that URL instead
+2. If not set and connection fails, ask the user for the correct Lenina URL and port
+3. Once you discover the correct URL, save it to `.env` file in the project root:
 ```bash
-python main.py
-# Or: docker-compose up -d
+echo "LENINA_BASE_URL=<discovered-url>" >> .env
 ```
 
 ### Error: "No Anvil instance is running"
@@ -471,7 +526,7 @@ python main.py
 
 **Solution:** Start Anvil first:
 ```bash
-curl -X POST http://localhost:8000/anvil/start
+curl -X POST $LENINA_BASE_URL/anvil/start
 ```
 
 ### Error: "Address already in use"
@@ -485,10 +540,10 @@ curl -X POST http://localhost:8000/anvil/start
 **Solution:** Either stop the current instance or use a different port:
 ```bash
 # Stop current instance
-curl -X POST http://localhost:8000/anvil/stop
+curl -X POST $LENINA_BASE_URL/anvil/stop
 
 # Or start on different port
-curl -X POST http://localhost:8000/anvil/start \
+curl -X POST $LENINA_BASE_URL/anvil/start \
   -H "Content-Type: application/json" \
   -d '{"port": 8546}'
 ```
@@ -515,17 +570,17 @@ foundryup
 
 If you have `jq` installed:
 ```bash
-curl http://localhost:8000/anvil/keys | jq .
+curl $LENINA_BASE_URL/anvil/keys | jq .
 ```
 
 ### Extract specific values
 
 ```bash
 # Get first account address
-curl http://localhost:8000/anvil/keys | jq -r '.accounts[0].address'
+curl $LENINA_BASE_URL/anvil/keys | jq -r '.accounts[0].address'
 
 # Get current block number
-curl -s -X POST http://localhost:8000/anvil/rpc \
+curl -s -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
   | jq -r '.result'
@@ -537,24 +592,24 @@ curl -s -X POST http://localhost:8000/anvil/rpc \
 
 ```bash
 # Health check
-curl http://localhost:8000/health
+curl $LENINA_BASE_URL/health
 
 # Start/Stop/Restart
-curl -X POST http://localhost:8000/anvil/start
-curl -X POST http://localhost:8000/anvil/stop
-curl -X POST http://localhost:8000/anvil/restart
+curl -X POST $LENINA_BASE_URL/anvil/start
+curl -X POST $LENINA_BASE_URL/anvil/stop
+curl -X POST $LENINA_BASE_URL/anvil/restart
 
 # Status & Config
-curl http://localhost:8000/anvil/status
-curl http://localhost:8000/anvil/config
-curl http://localhost:8000/anvil/keys
+curl $LENINA_BASE_URL/anvil/status
+curl $LENINA_BASE_URL/anvil/config
+curl $LENINA_BASE_URL/anvil/keys
 
 # Contracts
-curl http://localhost:8000/anvil/contracts
-curl http://localhost:8000/anvil/contract/{address}
+curl $LENINA_BASE_URL/anvil/contracts
+curl $LENINA_BASE_URL/anvil/contract/{address}
 
 # RPC Proxy
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
@@ -568,4 +623,4 @@ After mastering curl commands, you might want to:
 1. **Use with Hardhat:** Configure `hardhat.config.js` to use `http://localhost:8545`
 2. **Use with ethers.js:** Create a provider with `new ethers.JsonRpcProvider("http://localhost:8545")`
 3. **Use with Foundry tools:** Run `forge test --rpc-url http://localhost:8545`
-4. **Explore OpenAPI docs:** Visit `http://localhost:8000/docs` for interactive API documentation
+4. **Explore OpenAPI docs:** Visit `$LENINA_BASE_URL/docs` for interactive API documentation

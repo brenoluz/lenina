@@ -61,7 +61,6 @@ curl http://localhost:8000/health
 | `GET` | `/anvil/status` | Get Anvil running status |
 | `GET` | `/anvil/keys` | Get private keys and addresses |
 | `GET` | `/anvil/config` | Get Anvil configuration |
-| `GET` | `/anvil/contracts` | List deployed contracts |
 | `GET` | `/anvil/contract/{address}` | Check contract at address |
 | `GET` | `/anvil/logs` | Get recent log lines |
 | `GET` | `/anvil/logs/stream` | Stream logs via SSE |
@@ -86,12 +85,6 @@ curl -X POST http://localhost:8000/anvil/start \
 
 ```bash
 curl http://localhost:8000/anvil/keys
-```
-
-### List Deployed Contracts
-
-```bash
-curl http://localhost:8000/anvil/contracts
 ```
 
 ### Stream Logs

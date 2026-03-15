@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - Remove Unreliable Contract Listing
+
+### 🗑️ Removed
+
+- **Endpoint Removed**
+  - `GET /anvil/contracts` - Removed unreliable contract listing endpoint
+  - Contract tracking via stdout parsing was unreliable for RPC deployments
+  - External tools deploying contracts via RPC were not tracked
+
+### ✅ Remaining Contract Features
+
+- `GET /anvil/contract/{address}` - Check if contract exists at address (uses eth_getCode)
+
+### 📝 Documentation
+
+- Updated API documentation to reflect removed endpoint
+- Updated README, DOCKERHUB, and SKILL guides
+
+---
+
 ## [0.1.0] - Initial Release
 
 ### 🚀 Added
@@ -23,7 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GET /health` - Health check endpoint
 
 - **Contract Management**
-  - `GET /anvil/contracts` - List all deployed contracts (auto-tracked)
   - `GET /anvil/contract/{address}` - Check if contract exists at address
 
 - **Log Management**
@@ -51,7 +70,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - subprocess for Anvil process management
 - httpx for RPC proxying
 - Circular buffer for log storage (max 1000 lines)
-- Automatic contract deployment tracking via stdout parsing
 
 ### 📦 Configuration
 
@@ -75,5 +93,6 @@ git tag -a v0.2.0 -m "Release description"
 git push origin v0.2.0
 ```
 
-[Unreleased]: https://github.com/your-org/lenina/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/your-org/lenina/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/your-org/lenina/releases/tag/v0.1.1
 [0.1.0]: https://github.com/your-org/lenina/releases/tag/v0.1.0

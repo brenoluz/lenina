@@ -406,26 +406,6 @@ curl -X POST $LENINA_BASE_URL/anvil/rpc \
 
 ## Workflow 7: Check Deployed Contracts
 
-### List all deployed contracts
-
-```bash
-curl $LENINA_BASE_URL/anvil/contracts
-```
-
-**Response:**
-```json
-{
-  "contracts": [
-    {
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "bytecodeHash": "0xabc123...",
-      "deploymentBlock": 1,
-      "abi": null
-    }
-  ]
-}
-```
-
 ### Check if a specific address has a contract
 
 ```bash
@@ -495,14 +475,11 @@ curl -X POST $LENINA_BASE_URL/anvil/rpc \
   }'
 
 # 7. Verify the transaction by checking block number (should have increased)
-curl -X POST $LENINA_BASE_URL/anvil/rpc \
+ curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
-# 8. List any deployed contracts
-curl $LENINA_BASE_URL/anvil/contracts
-
-# 9. When done, stop Anvil
+# 8. When done, stop Anvil
 curl -X POST $LENINA_BASE_URL/anvil/stop
 ```
 
@@ -640,7 +617,6 @@ curl $LENINA_BASE_URL/anvil/config
 curl $LENINA_BASE_URL/anvil/keys
 
 # Contracts
-curl $LENINA_BASE_URL/anvil/contracts
 curl $LENINA_BASE_URL/anvil/contract/{address}
 
 # RPC Proxy

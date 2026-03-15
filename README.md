@@ -264,26 +264,6 @@ GET /anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3
 }
 ```
 
-### List Contracts
-
-```http
-GET /anvil/contracts
-```
-
-**Response:**
-```json
-{
-  "contracts": [
-    {
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "bytecodeHash": "0xabc123...",
-      "deploymentBlock": 1,
-      "abi": null
-    }
-  ]
-}
-```
-
 ### Proxy RPC Request
 
 ```http

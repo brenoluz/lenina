@@ -322,61 +322,10 @@ GET /anvil/contract/{address}
 }
 ```
 
-`404 Not Found` - No contract at address
+ `404 Not Found` - No contract at address
 ```json
 {
   "detail": "No contract deployed at address 0x..."
-}
-```
-
----
-
-### List Contracts
-
-```http
-GET /anvil/contracts
-```
-
-**Description:** List all deployed contracts tracked by Lenina.
-
-**Response:** `200 OK`
-```json
-{
-  "contracts": [
-    {
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "bytecodeHash": "0xabc123...",
-      "deploymentBlock": 1,
-      "abi": null
-    }
-  ]
-}
-```
-
-**Response Fields:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `contracts` | array | List of deployed contract objects |
-| `contracts[].address` | string | Contract address (0x-prefixed) |
-| `contracts[].bytecodeHash` | string | SHA256 hash of contract bytecode |
-| `contracts[].deploymentBlock` | integer | Block number where contract was deployed |
-| `contracts[].abi` | object/null | Contract ABI (if available) |
-
-**How it works:** Lenina automatically tracks contracts deployed to Anvil by parsing its output. This includes contracts deployed via:
-- Direct RPC calls to port 8545 (web3.py, ethers.js, etc.)
-- The `/anvil/rpc` proxy endpoint
-- Foundry tools (`forge deploy`, `cast send`)
-- Any other method that deploys contracts to the Anvil instance
-
-**Note:** Contract tracking is in-memory and resets when Anvil restarts.
-
-**Error Responses:**
-
-`400 Bad Request` - No instance running
-```json
-{
-  "detail": "No Anvil instance is running"
 }
 ```
 

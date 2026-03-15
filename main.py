@@ -105,19 +105,6 @@ class AnvilKeysResponse(BaseModel):
     mnemonic: Optional[str] = None
 
 
-class ContractInfo(BaseModel):
-    """Information about a deployed contract"""
-    address: str
-    bytecodeHash: str
-    deploymentBlock: int
-    abi: Optional[Dict[str, Any]] = None
-
-
-class ContractsListResponse(BaseModel):
-    """Response from listing deployed contracts"""
-    contracts: List[ContractInfo]
-
-
 class ContractDetailsResponse(BaseModel):
     """Response from checking contract at address"""
     address: str
@@ -173,7 +160,6 @@ anvil_process: Optional[subprocess.Popen[Any]] = None
 anvil_start_time: Optional[float] = None
 anvil_config: Optional[Dict[str, Any]] = None
 anvil_accounts: List[PrivateKeyInfo] = []
-deployed_contracts: List[Dict[str, Any]] = []
 anvil_logs: List[Dict[str, Any]] = []
 anvil_log_sequence: int = 0
 LOG_BUFFER_MAX = 1000
@@ -220,9 +206,8 @@ def format_logs_as_markdown(logs: List[Dict[str, Any]]) -> str:
 
 async def capture_anvil_output():
     """Continuously capture Anvil stdout in background"""
-    global anvil_process, deployed_contracts
+    global anvil_process
     
-    contract_deploy_pattern = re.compile(r"(?:Deployed|Contract deployed)\s+(?:at\s+)?(0x[0-9a-fA-F]{40})", re.IGNORECASE)
     current_block = 0
     
     while anvil_process is not None and anvil_process.poll() is None:
@@ -236,19 +221,6 @@ async def capture_anvil_output():
                         block_match = re.search(r"Block\s+(\d+)", line, re.IGNORECASE)
                         if block_match:
                             current_block = int(block_match.group(1))
-                        
-                        deploy_match = contract_deploy_pattern.search(line)
-                        if deploy_match:
-                            address = deploy_match.group(1)
-                            import hashlib
-                            bytecode_hash = "0x" + hashlib.sha256(address.encode()).hexdigest()
-                            
-                            deployed_contracts.append({
-                                "address": address,
-                                "bytecodeHash": bytecode_hash,
-                                "deploymentBlock": current_block,
-                                "abi": None
-                            })
             except BlockingIOError:
                 pass
         await asyncio.sleep(0.1)
@@ -316,27 +288,6 @@ async def get_private_keys() -> AnvilKeysResponse:
     return AnvilKeysResponse(
         accounts=anvil_accounts,
         mnemonic=anvil_config.get("mnemonic") if anvil_config else None
-    )
-
-
-@app.get("/anvil/contracts", response_model=ContractsListResponse)
-async def list_contracts() -> ContractsListResponse:
-    """
-    List all deployed contracts.
-
-    Response includes: address, deploymentBlock, bytecodeHash for each.
-    Contracts tracked from session start or persistence if configured.
-    Returns 400 if Anvil is not running.
-    """
-    # Check if Anvil is running
-    if anvil_process is None or anvil_process.poll() is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No Anvil instance is running"
-        )
-
-    return ContractsListResponse(
-        contracts=[ContractInfo(**c) for c in deployed_contracts]
     )
 
 
@@ -530,8 +481,6 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
             "gasLimit": gas_limit,
             "mnemonic": mnemonic
         }
-
-        deployed_contracts.clear()
 
         asyncio.create_task(capture_anvil_output())
 
@@ -923,8 +872,6 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
             "gasLimit": gas_limit,
             "mnemonic": mnemonic
         }
-
-        deployed_contracts.clear()
 
         asyncio.create_task(capture_anvil_output())
 

@@ -81,13 +81,6 @@ class TestAnvilStatusWithoutInstance:
         assert response.status_code == 400
         assert "instance" in response.json()["detail"]
     
-    def test_list_contracts_not_running(self, client: TestClient):
-        """Test listing contracts when Anvil is not running."""
-        response = client.get("/anvil/contracts")
-        
-        assert response.status_code == 400
-        assert "instance" in response.json()["detail"]
-    
     def test_check_contract_not_running(self, client: TestClient):
         """Test checking contract when Anvil is not running."""
         response = client.get("/anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3")
@@ -233,6 +226,71 @@ class TestAPIValidation:
         response = client.get("/anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3")
         # Should not be a 400 for invalid format
         assert response.status_code != 400 or "Invalid Ethereum" not in response.json().get("detail", "")
+
+
+class TestCheckContractWithAnvilRunning:
+    """Tests for checking contracts when Anvil is running."""
+    
+    def test_check_contract_not_deployed(self, client: TestClient):
+        """Test checking an address without a contract returns 404."""
+        import time
+        
+        start_response = client.post("/anvil/start", json={"port": 9548})
+        assert start_response.status_code == 200
+        time.sleep(0.3)
+        
+        try:
+            response = client.get("/anvil/contract/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
+            assert response.status_code == 404
+            assert "No contract deployed" in response.json()["detail"]
+        finally:
+            client.post("/anvil/stop")
+            time.sleep(0.2)
+    
+    def test_check_contract_via_rpc(self, client: TestClient):
+        """Test checking contract existence via eth_getCode through RPC proxy."""
+        import time
+        import requests
+        
+        start_response = client.post("/anvil/start", json={"port": 9549})
+        assert start_response.status_code == 200
+        time.sleep(0.3)
+        
+        try:
+            port = start_response.json().get("port", 9549)
+            rpc_url = f"http://127.0.0.1:{port}"
+            time.sleep(0.5)
+            
+            accounts_resp = requests.post(rpc_url, json={
+                "jsonrpc": "2.0", "method": "eth_accounts", "params": [], "id": 1
+            }, timeout=5)
+            accounts = accounts_resp.json().get("result", [])
+            
+            if not accounts:
+                pytest.skip("No accounts available")
+            
+            code_resp = requests.post(rpc_url, json={
+                "jsonrpc": "2.0",
+                "method": "eth_getCode",
+                "params": [accounts[0], "latest"],
+                "id": 1
+            }, timeout=5)
+            code = code_resp.json().get("result", "0x")
+            assert code == "0x", "EOA should have no code"
+            
+            contract_response = client.get(f"/anvil/contract/{accounts[0]}")
+            assert contract_response.status_code == 404
+            
+            rpc_response = client.post("/anvil/rpc", json={
+                "method": "eth_blockNumber",
+                "params": [],
+                "id": 1
+            })
+            assert rpc_response.status_code == 200
+            assert "result" in rpc_response.json()
+        finally:
+            client.post("/anvil/stop")
+            time.sleep(0.2)
 
 
 class TestDocumentation:

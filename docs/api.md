@@ -422,6 +422,159 @@ Content-Type: application/json
 
 ---
 
+### Mining Control
+
+#### Disable Auto-Mining
+
+```http
+POST /anvil/mining/disable
+```
+
+**Description:** Disable automatic mining. Transactions will remain pending in the mempool until manually mined. Useful for testing transaction ordering, batch processing, and precise control over block production.
+
+**Response:** `200 OK`
+```json
+{
+  "autoMine": false,
+  "interval": 0,
+  "blockNumber": 42
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `autoMine` | boolean | Whether auto-mining is enabled |
+| `interval` | integer | Block time interval (0 = instant) |
+| `blockNumber` | integer | Current block number |
+
+**Error Responses:**
+
+`400 Bad Request` - No instance running
+```json
+{
+  "detail": "No Anvil instance is running"
+}
+```
+
+#### Enable Auto-Mining
+
+```http
+POST /anvil/mining/enable
+Content-Type: application/json
+```
+
+**Description:** Enable automatic mining.
+
+**Request Body:** (optional)
+```json
+{
+  "interval": 0
+}
+```
+
+**Request Fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `interval` | integer | `0` | Block time interval (note: interval mining requires restart with blockTime) |
+
+**Response:** `200 OK`
+```json
+{
+  "autoMine": true,
+  "interval": 0,
+  "blockNumber": 43
+}
+```
+
+**Note:** For interval mining (blocks every N seconds), restart Anvil with `blockTime` parameter via `/anvil/restart`.
+
+#### Get Mining Status
+
+```http
+GET /anvil/mining/status
+```
+
+**Description:** Get current mining status including auto-mining state and block number.
+
+**Response:** `200 OK`
+```json
+{
+  "autoMine": true,
+  "interval": 0,
+  "blockNumber": 43
+}
+```
+
+#### Manually Mine Blocks
+
+```http
+POST /anvil/mining/mine
+```
+
+**Description:** Manually mine blocks on demand. Useful when auto-mining is disabled.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `blocks` | integer | `1` | Number of blocks to mine (1-1000) |
+| `interval` | float | `null` | Interval in seconds between each block |
+
+**Examples:**
+
+Mine 1 block:
+```bash
+curl -X POST http://localhost:8000/anvil/mining/mine
+```
+
+Mine 10 blocks:
+```bash
+curl -X POST "http://localhost:8000/anvil/mining/mine?blocks=10"
+```
+
+Mine 5 blocks with 0.5s interval:
+```bash
+curl -X POST "http://localhost:8000/anvil/mining/mine?blocks=5&interval=0.5"
+```
+
+**Response:** `200 OK`
+```json
+{
+  "blocksMined": 10,
+  "newBlockNumber": 53,
+  "status": "success"
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `blocksMined` | integer | Number of blocks mined |
+| `newBlockNumber` | integer | New block number after mining |
+| `status` | string | Status indicator ("success") |
+
+**Error Responses:**
+
+`400 Bad Request` - No instance running or RPC error
+```json
+{
+  "detail": "No Anvil instance is running"
+}
+```
+
+`422 Unprocessable Entity` - Validation error (blocks out of range)
+```json
+{
+  "detail": [validation errors]
+}
+```
+
+---
+
 ## Error Handling
 
 All errors follow the FastAPI standard format:

@@ -7,44 +7,11 @@ description: How to use the Lenina project (Anvil REST API management) using cur
 
 This skill provides complete workflow-style guidance for using the Lenina REST API with curl commands. Designed for users familiar with curl but new to blockchain/Anvil concepts.
 
-## Installation
+## Configuration
 
-### Using Docker Hub (Recommended)
+**Lenina Base URL:** `http://mini:8000`
 
-```bash
-# Pull the official image
-docker pull brenoluz/lenina:v0.1.0
-
-# Run the container
-docker run -d -p 8000:8000 -p 8545:8545 --name lenina brenoluz/lenina:v0.1.0
-
-# Verify it's running
-curl http://localhost:8000/health
-```
-
-### Using Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-### Local Development
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the server
-python main.py
-```
-
-## Quick Reference
-
-**Base URL:** Use the `LENINA_BASE_URL` environment variable. If not set, test `http://localhost:8000` with a health check request. If that fails, ask the user for the correct Lenina URL and port. Once you discover the correct URL, save it to a `.env` file in the project root as `LENINA_BASE_URL=<url>` if one doesn't exist.
-
-**Anvil RPC URL:** `http://localhost:8545` (default Anvil port, exposed by Lenina)
-
-**Docker Image:** `brenoluz/lenina:v0.1.0` (available on Docker Hub)
+**Anvil RPC URL:** `http://192.168.1.12:8545` (remote server)
 
 **GitHub:** https://github.com/brenoluz/lenina
 
@@ -52,57 +19,14 @@ python main.py
 
 ## Environment Setup
 
-### Determine Base URL
-
-Before using the API, determine the correct Lenina base URL:
+### Set Base URL
 
 ```bash
-# 1. Check if LENINA_BASE_URL is set
-echo $LENINA_BASE_URL
-
-# 2. If empty, test default
-curl http://localhost:8000/health
-
-# 3. If that fails, ask user for the correct URL
-
-# 4. Once found, save to .env file (if not already set):
-echo "LENINA_BASE_URL=<discovered-url>" >> .env
-
-# 5. Export for current session:
-export LENINA_BASE_URL=<discovered-url>
+# Export for current session:
+export LENINA_BASE_URL=http://mini:8000
 ```
 
-**Note:** Always use `$LENINA_BASE_URL` in curl commands after determining the correct URL.
-
-### Alternative: Connect Directly to Anvil
-
-If you already have an Anvil instance running, you can connect directly to it and get its configuration:
-
-```bash
-# Get Anvil config to find the correct URL
-curl $LENINA_BASE_URL/anvil/config
-```
-
-**Response:**
-```json
-{
-  "ip": "127.0.0.1",
-  "port": 8545,
-  "chainId": 31337,
-  ...
-}
-```
-
-From this response, you can determine:
-- **Anvil RPC URL:** `http://<ip>:<port>` (e.g., `http://127.0.0.1:8545`)
-- Use this URL for direct JSON-RPC calls to Anvil
-
-This is useful when:
-- Anvil is running on a non-default port
-- You want to bypass Lenina and talk directly to Anvil
-- You need to verify which port Anvil is listening on
-
----
+**Note:** Always use `$LENINA_BASE_URL` in curl commands after setting the URL.
 
 ## Workflow 1: Getting Started
 
@@ -120,10 +44,7 @@ curl $LENINA_BASE_URL/health
 }
 ```
 
-**If you get an error:** Ask the user for the correct Lenina URL and port, then save it to `.env`:
-```bash
-echo "LENINA_BASE_URL=<user-provided-url>" >> .env
-```
+**If you get an error:** Verify the Lenina server is accessible at `http://mini:8000`
 
 ### Step 2: Start Anvil (the local blockchain)
 
@@ -148,6 +69,8 @@ curl -X POST $LENINA_BASE_URL/anvil/start
 - `port`: The RPC port (8545 is the standard development port)
 - `chainId`: 31337 is the default local development chain ID
 - `status`: "running" means it's ready to use
+
+**Anvil RPC Endpoint:** `http://192.168.1.12:8545`
 
 ### Step 3: Verify Anvil is running
 
@@ -485,29 +408,211 @@ curl -X POST $LENINA_BASE_URL/anvil/stop
 
 ---
 
-## Workflow 9: Advanced - Mining and Block Time
+## Workflow 9: Mining Control - Disable Auto-Mining and Manual Block Production
 
-### Manually mine a block (when blockTime is 0)
+### Disable auto-mining for precise control
 
 ```bash
-# First, start Anvil with blockTime: 0 (auto-mine is default)
-curl -X POST $LENINA_BASE_URL/anvil/start \
-  -H "Content-Type: application/json" \
-  -d '{"blockTime": 0}'
-
-# Mine a block manually using RPC
-curl -X POST $LENINA_BASE_URL/anvil/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"evm_mine","params":[],"id":1}'
+# Disable automatic mining - transactions will stay pending until you manually mine
+curl -X POST $LENINA_BASE_URL/anvil/mining/disable
 ```
 
-### Set automatic block time
+**Response:**
+```json
+{
+  "autoMine": false,
+  "interval": 0,
+  "blockNumber": 42
+}
+```
+
+**Why disable auto-mining?** When auto-mining is disabled, transactions you send will remain pending in the mempool until you explicitly mine a block. This is useful for:
+- Testing transaction ordering
+- Batch multiple transactions before including them in a block
+- Simulating network congestion
+- Precise control over when transactions are executed
+
+### Enable auto-mining again
 
 ```bash
-# Mine a block every 5 seconds
-curl -X POST $LENINA_BASE_URL/anvil/start \
+# Re-enable instant auto-mining (default behavior)
+curl -X POST $LENINA_BASE_URL/anvil/mining/enable
+```
+
+**Response:**
+```json
+{
+  "autoMine": true,
+  "interval": 0,
+  "blockNumber": 43
+}
+```
+
+**Note:** For interval mining (blocks every N seconds), restart Anvil with `blockTime` parameter:
+```bash
+curl -X POST $LENINA_BASE_URL/anvil/restart \
   -H "Content-Type: application/json" \
   -d '{"blockTime": 5}'
+```
+
+### Check mining status
+
+```bash
+curl $LENINA_BASE_URL/anvil/mining/status
+```
+
+**Response:**
+```json
+{
+  "autoMine": true,
+  "interval": 0,
+  "blockNumber": 43
+}
+```
+
+### Manually mine blocks on demand
+
+```bash
+# Mine 1 block (default)
+curl -X POST $LENINA_BASE_URL/anvil/mining/mine
+```
+
+**Response:**
+```json
+{
+  "blocksMined": 1,
+  "newBlockNumber": 44,
+  "status": "success"
+}
+```
+
+### Mine multiple blocks at once
+
+```bash
+# Mine 10 blocks instantly
+curl -X POST "$LENINA_BASE_URL/anvil/mining/mine?blocks=10"
+```
+
+**Response:**
+```json
+{
+  "blocksMined": 10,
+  "newBlockNumber": 54,
+  "status": "success"
+}
+```
+
+### Mine blocks with interval between them
+
+```bash
+# Mine 5 blocks with 0.5 seconds between each
+curl -X POST "$LENINA_BASE_URL/anvil/mining/mine?blocks=5&interval=0.5"
+```
+
+**Response:**
+```json
+{
+  "blocksMined": 5,
+  "newBlockNumber": 59,
+  "status": "success"
+}
+```
+
+### Complete workflow: Test with manual mining control
+
+```bash
+# 1. Start Anvil
+curl -X POST $LENINA_BASE_URL/anvil/start
+
+# 2. Disable auto-mining
+curl -X POST $LENINA_BASE_URL/anvil/mining/disable
+
+# 3. Send a transaction (it will stay pending)
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "eth_sendTransaction",
+    "params": [{
+      "from": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "value": "0x16345785d8a0000"
+    }],
+    "id": 1
+  }'
+
+# 4. Check block number (won't have increased yet)
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+# 5. Manually mine a block to include the transaction
+curl -X POST $LENINA_BASE_URL/anvil/mining/mine
+
+# 6. Verify block number increased
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+# 7. Re-enable auto-mining
+curl -X POST $LENINA_BASE_URL/anvil/mining/enable
+
+# 8. Stop Anvil when done
+curl -X POST $LENINA_BASE_URL/anvil/stop
+```
+
+---
+
+## Workflow 10: Complete Development Workflow
+
+### Full workflow from start to finish
+
+```bash
+# 1. Check Lenina health
+curl $LENINA_BASE_URL/health
+
+# 2. Start Anvil with default settings
+curl -X POST $LENINA_BASE_URL/anvil/start
+
+# 3. Get the accounts and private keys
+curl $LENINA_BASE_URL/anvil/keys | jq .accounts[0]
+
+# 4. Check the balance of the first account
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "eth_getBalance",
+    "params": ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "latest"],
+    "id": 1
+  }'
+
+# 5. Get current block number
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+# 6. Send some ETH to another account
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "eth_sendTransaction",
+    "params": [{
+      "from": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "value": "0xDE0B6B3A7640000"
+    }],
+    "id": 1
+  }'
+
+# 7. Verify the transaction by checking block number (should have increased)
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+# 8. When done, stop Anvil
+curl -X POST $LENINA_BASE_URL/anvil/stop
 ```
 
 ---
@@ -517,16 +622,12 @@ curl -X POST $LENINA_BASE_URL/anvil/start \
 ### Error: "Connection refused"
 
 ```bash
-curl: (7) Failed to connect to localhost port 8000
+curl: (7) Failed to connect to mini port 8000
 ```
 
 **Solution:** 
-1. Check if `LENINA_BASE_URL` environment variable is set and use that URL instead
-2. If not set and connection fails, ask the user for the correct Lenina URL and port
-3. Once you discover the correct URL, save it to `.env` file in the project root:
-```bash
-echo "LENINA_BASE_URL=<discovered-url>" >> .env
-```
+1. Verify the Lenina server is running at `http://mini:8000`
+2. Check network connectivity to the server
 
 ### Error: "No Anvil instance is running"
 
@@ -616,6 +717,13 @@ curl $LENINA_BASE_URL/anvil/status
 curl $LENINA_BASE_URL/anvil/config
 curl $LENINA_BASE_URL/anvil/keys
 
+# Mining Control
+curl -X POST $LENINA_BASE_URL/anvil/mining/disable       # Disable auto-mining
+curl -X POST $LENINA_BASE_URL/anvil/mining/enable        # Enable auto-mining
+curl $LENINA_BASE_URL/anvil/mining/status                # Get mining status
+curl -X POST $LENINA_BASE_URL/anvil/mining/mine          # Mine 1 block
+curl -X POST "$LENINA_BASE_URL/anvil/mining/mine?blocks=10"  # Mine 10 blocks
+
 # Contracts
 curl $LENINA_BASE_URL/anvil/contract/{address}
 
@@ -631,14 +739,13 @@ curl -X POST $LENINA_BASE_URL/anvil/rpc \
 
 After mastering curl commands, you might want to:
 
-1. **Use with Hardhat:** Configure `hardhat.config.js` to use `http://localhost:8545`
-2. **Use with ethers.js:** Create a provider with `new ethers.JsonRpcProvider("http://localhost:8545")`
-3. **Use with Foundry tools:** Run `forge test --rpc-url http://localhost:8545`
-4. **Explore OpenAPI docs:** Visit `$LENINA_BASE_URL/docs` for interactive API documentation
+1. **Use with Hardhat:** Configure `hardhat.config.js` to use `http://192.168.1.12:8545`
+2. **Use with ethers.js:** Create a provider with `new ethers.JsonRpcProvider("http://192.168.1.12:8545")`
+3. **Use with Foundry tools:** Run `forge test --rpc-url http://192.168.1.12:8545`
+4. **Explore OpenAPI docs:** Visit `http://mini:8000/docs` for interactive API documentation
 
 ## Resources
 
-- **Docker Hub:** https://hub.docker.com/r/brenoluz/lenina
 - **GitHub:** https://github.com/brenoluz/lenina
-- **API Docs:** `http://localhost:8000/docs`
+- **API Docs:** `http://mini:8000/docs`
 - **Changelog:** https://github.com/brenoluz/lenina/blob/main/CHANGELOG.md

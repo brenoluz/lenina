@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - Mining Control Endpoints
+
+### ⛏️ Added
+
+- **Mining Control Endpoints**
+  - `POST /anvil/mining/disable` - Disable auto-mining for precise transaction control
+  - `POST /anvil/mining/enable` - Enable auto-mining
+  - `GET /anvil/mining/status` - Get mining status (autoMine, interval, blockNumber)
+  - `POST /anvil/mining/mine` - Manually mine blocks on demand (1-1000 blocks)
+  - Support for optional interval parameter between mined blocks
+
+- **Use Cases**
+  - Transaction ordering testing
+  - Batch transaction processing
+  - Network congestion simulation
+  - Precise control over block production timing
+
+### 🧪 Testing
+
+- Added 16 comprehensive tests for mining control endpoints
+- All 42 tests passing with full coverage
+- Tests include workflow scenarios and edge cases
+
+### 📝 Documentation
+
+- Updated README.md with mining control examples
+- Updated docs/api.md with complete API reference
+- Updated skills/lenina/SKILL.md with curl workflows
+- Added mining control to Quick Reference Card
+
+### 🔧 Technical
+
+- New Pydantic models: `MiningConfig`, `MiningStatusResponse`, `MineBlocksResponse`
+- RPC integration using `evm_setAutomine` and `anvil_mine` methods
+- Input validation for blocks parameter (1-1000 range)
+
+---
+
 ## [0.1.1] - Remove Unreliable Contract Listing
 
 ### 🗑️ Removed
@@ -93,6 +131,7 @@ git tag -a v0.2.0 -m "Release description"
 git push origin v0.2.0
 ```
 
-[Unreleased]: https://github.com/your-org/lenina/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/your-org/lenina/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/your-org/lenina/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/your-org/lenina/releases/tag/v0.1.1
 [0.1.0]: https://github.com/your-org/lenina/releases/tag/v0.1.0

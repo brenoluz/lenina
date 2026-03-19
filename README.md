@@ -12,6 +12,7 @@ Lenina is a Python-based RESTful API for managing Anvil (Foundry's local Ethereu
 
 - 🚀 **Full Anvil Lifecycle Management** - Start, stop, and restart Anvil instances via REST API
 - 🔑 **Private Key Access** - Retrieve all generated private keys and addresses programmatically
+- ⛏️ **Mining Control** - Disable auto-mining, manually mine blocks, and control block production
 - 📋 **Automatic Contract Tracking** - Auto-detect contracts deployed via any method (RPC, Foundry, web3.py, etc.)
 - ⚙️ **Configuration Exposure** - Get all Anvil configuration settings via API
 - 🔄 **RPC Proxy** - Forward JSON-RPC requests to Anvil through the REST API
@@ -297,6 +298,96 @@ Content-Type: application/json
 - `eth_getLogs` - Get event logs
 - And all other standard Ethereum JSON-RPC methods
 
+### Mining Control
+
+#### Disable Auto-Mining
+
+```http
+POST /anvil/mining/disable
+```
+
+**Description:** Disable automatic mining. Transactions will remain pending until manually mined.
+
+**Response:** `200 OK`
+```json
+{
+  "autoMine": false,
+  "interval": 0,
+  "blockNumber": 42
+}
+```
+
+#### Enable Auto-Mining
+
+```http
+POST /anvil/mining/enable
+Content-Type: application/json
+
+{
+  "interval": 0
+}
+```
+
+**Description:** Enable automatic mining.
+
+**Response:** `200 OK`
+```json
+{
+  "autoMine": true,
+  "interval": 0,
+  "blockNumber": 43
+}
+```
+
+**Note:** For interval mining (blocks every N seconds), restart Anvil with `blockTime` parameter.
+
+#### Get Mining Status
+
+```http
+GET /anvil/mining/status
+```
+
+**Response:** `200 OK`
+```json
+{
+  "autoMine": true,
+  "interval": 0,
+  "blockNumber": 43
+}
+```
+
+#### Manually Mine Blocks
+
+```http
+POST /anvil/mining/mine?blocks=1&interval=0
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `blocks` | integer | `1` | Number of blocks to mine (1-1000) |
+| `interval` | float | `null` | Interval in seconds between blocks |
+
+**Response:** `200 OK`
+```json
+{
+  "blocksMined": 1,
+  "newBlockNumber": 44,
+  "status": "success"
+}
+```
+
+**Example - Mine 10 blocks:**
+```bash
+curl -X POST "http://localhost:8000/anvil/mining/mine?blocks=10"
+```
+
+**Example - Mine 5 blocks with 0.5s interval:**
+```bash
+curl -X POST "http://localhost:8000/anvil/mining/mine?blocks=5&interval=0.5"
+```
+
 ### Get Anvil Logs
 
 ```http
@@ -396,13 +487,27 @@ curl -X POST http://localhost:8000/anvil/rpc \
 # 6. Check contract deployment
 curl http://localhost:8000/anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3
 
-# 7. Get recent logs
+# 7. Disable auto-mining for precise control
+curl -X POST http://localhost:8000/anvil/mining/disable
+
+# 8. Send transaction (will stay pending)
+curl -X POST http://localhost:8000/anvil/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":[{"from":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266","to":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8","value":"0x16345785d8a0000"}],"id":1}'
+
+# 9. Manually mine a block to include transaction
+curl -X POST http://localhost:8000/anvil/mining/mine
+
+# 10. Get recent logs
 curl http://localhost:8000/anvil/logs?lines=30
 
-# 8. Stream logs
+# 11. Stream logs
 curl -N http://localhost:8000/anvil/logs/stream
 
-# 9. Stop Anvil
+# 12. Re-enable auto-mining
+curl -X POST http://localhost:8000/anvil/mining/enable
+
+# 13. Stop Anvil
 curl -X POST http://localhost:8000/anvil/stop
 ```
 

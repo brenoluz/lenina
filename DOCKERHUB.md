@@ -18,6 +18,15 @@ RESTful API for managing Anvil (Foundry's local Ethereum blockchain) with full l
 
 ## Quick Start
 
+### Set Environment Variable
+
+For consistent usage across all examples, set the base URL:
+
+```bash
+export LENINA_BASE_URL=http://localhost:8000
+# For remote servers: export LENINA_BASE_URL=http://your-server-ip:8000
+```
+
 ### Using Docker Run
 
 ```bash
@@ -47,7 +56,7 @@ docker-compose up -d
 ### Verify It's Running
 
 ```bash
-curl http://localhost:8000/health
+curl $LENINA_BASE_URL/health
 ```
 
 ## API Endpoints
@@ -71,7 +80,7 @@ curl http://localhost:8000/health
 ### Start Anvil
 
 ```bash
-curl -X POST http://localhost:8000/anvil/start \
+curl -X POST $LENINA_BASE_URL/anvil/start \
   -H "Content-Type: application/json" \
   -d '{
     "port": 8545,
@@ -84,19 +93,19 @@ curl -X POST http://localhost:8000/anvil/start \
 ### Get Private Keys
 
 ```bash
-curl http://localhost:8000/anvil/keys
+curl $LENINA_BASE_URL/anvil/keys
 ```
 
 ### Stream Logs
 
 ```bash
-curl -N http://localhost:8000/anvil/logs/stream
+curl -N $LENINA_BASE_URL/anvil/logs/stream
 ```
 
 ### Proxy RPC Request
 
 ```bash
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -132,8 +141,8 @@ docker run -d \
 
 ## Documentation
 
-- **Swagger UI:** `http://localhost:8000/docs`
-- **ReDoc:** `http://localhost:8000/redoc`
+- **Swagger UI:** `$LENINA_BASE_URL/docs`
+- **ReDoc:** `$LENINA_BASE_URL/redoc`
 - **GitHub:** https://github.com/brenoluz/lenina
 - **API Reference:** https://github.com/brenoluz/lenina/blob/main/docs/api.md
 - **Changelog:** https://github.com/brenoluz/lenina/blob/main/CHANGELOG.md

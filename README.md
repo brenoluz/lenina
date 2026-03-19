@@ -40,16 +40,17 @@ docker-compose up -d
 **Verify it's running:**
 
 ```bash
-curl http://localhost:8000/health
+export LENINA_BASE_URL=http://localhost:8000
+curl $LENINA_BASE_URL/health
 ```
 
 **Start Anvil:**
 
 ```bash
-curl -X POST http://localhost:8000/anvil/start
+curl -X POST $LENINA_BASE_URL/anvil/start
 ```
 
-**Access API docs:** Open http://localhost:8000/docs in your browser
+**Access API docs:** Open $LENINA_BASE_URL/docs in your browser
 
 ### Local Setup
 
@@ -81,7 +82,8 @@ python main.py
 4. **Start Anvil via API:**
 
 ```bash
-curl -X POST http://localhost:8000/anvil/start
+export LENINA_BASE_URL=http://localhost:8000
+curl -X POST $LENINA_BASE_URL/anvil/start
 ```
 
 ## API Endpoints
@@ -380,12 +382,12 @@ POST /anvil/mining/mine?blocks=1&interval=0
 
 **Example - Mine 10 blocks:**
 ```bash
-curl -X POST "http://localhost:8000/anvil/mining/mine?blocks=10"
+curl -X POST "$LENINA_BASE_URL/anvil/mining/mine?blocks=10"
 ```
 
 **Example - Mine 5 blocks with 0.5s interval:**
 ```bash
-curl -X POST "http://localhost:8000/anvil/mining/mine?blocks=5&interval=0.5"
+curl -X POST "$LENINA_BASE_URL/anvil/mining/mine?blocks=5&interval=0.5"
 ```
 
 ### Get Anvil Logs
@@ -429,10 +431,10 @@ GET /anvil/logs/stream?since=0&format=text
 **Example:**
 ```bash
 # Stream logs in terminal
-curl -N http://localhost:8000/anvil/logs/stream
+curl -N $LENINA_BASE_URL/anvil/logs/stream
 
 # Get logs after sequence 100
-curl -N http://localhost:8000/anvil/logs/stream?since=100
+curl -N $LENINA_BASE_URL/anvil/logs/stream?since=100
 ```
 
 ## Configuration
@@ -467,48 +469,51 @@ services:
 ### Complete Workflow
 
 ```bash
+# 0. Set the base URL (add to your shell profile for persistence)
+export LENINA_BASE_URL=http://localhost:8000
+
 # 1. Start Lenina (using Docker)
 docker run -d -p 8000:8000 -p 8545:8545 --name lenina brenoluz/lenina:v0.1.0
 
 # 2. Start Anvil
-curl -X POST http://localhost:8000/anvil/start
+curl -X POST $LENINA_BASE_URL/anvil/start
 
 # 3. Get status
-curl http://localhost:8000/anvil/status
+curl $LENINA_BASE_URL/anvil/status
 
 # 4. Get private keys
-curl http://localhost:8000/anvil/keys
+curl $LENINA_BASE_URL/anvil/keys
 
 # 5. Send RPC request
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
 # 6. Check contract deployment
-curl http://localhost:8000/anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3
+curl $LENINA_BASE_URL/anvil/contract/0x5FbDB2315678afecb367f032d93F642f64180aa3
 
 # 7. Disable auto-mining for precise control
-curl -X POST http://localhost:8000/anvil/mining/disable
+curl -X POST $LENINA_BASE_URL/anvil/mining/disable
 
 # 8. Send transaction (will stay pending)
-curl -X POST http://localhost:8000/anvil/rpc \
+curl -X POST $LENINA_BASE_URL/anvil/rpc \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":[{"from":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266","to":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8","value":"0x16345785d8a0000"}],"id":1}'
 
 # 9. Manually mine a block to include transaction
-curl -X POST http://localhost:8000/anvil/mining/mine
+curl -X POST $LENINA_BASE_URL/anvil/mining/mine
 
 # 10. Get recent logs
-curl http://localhost:8000/anvil/logs?lines=30
+curl $LENINA_BASE_URL/anvil/logs?lines=30
 
 # 11. Stream logs
-curl -N http://localhost:8000/anvil/logs/stream
+curl -N $LENINA_BASE_URL/anvil/logs/stream
 
 # 12. Re-enable auto-mining
-curl -X POST http://localhost:8000/anvil/mining/enable
+curl -X POST $LENINA_BASE_URL/anvil/mining/enable
 
 # 13. Stop Anvil
-curl -X POST http://localhost:8000/anvil/stop
+curl -X POST $LENINA_BASE_URL/anvil/stop
 ```
 
 ### Using with Hardhat/Foundry
@@ -534,10 +539,11 @@ module.exports = {
 const { ethers } = require("ethers");
 
 // Get keys from Lenina
-const response = await fetch("http://localhost:8000/anvil/keys");
+const LENINA_BASE_URL = process.env.LENINA_BASE_URL || "http://localhost:8000";
+const response = await fetch(`${LENINA_BASE_URL}/anvil/keys`);
 const { accounts } = await response.json();
 
-// Create provider and signer
+// Create provider and signer (Anvil RPC runs on port 8545)
 const provider = new ethers.JsonRpcProvider("http://localhost:8545");
 const signer = new ethers.Wallet(accounts[0].privateKey, provider);
 

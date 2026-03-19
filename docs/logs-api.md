@@ -2,6 +2,23 @@
 
 The Lenina API now provides real-time access to Anvil's console output through RESTful endpoints.
 
+## Environment Setup
+
+Before using the examples in this guide, set the `LENINA_BASE_URL` environment variable:
+
+```bash
+# For local development
+export LENINA_BASE_URL=http://localhost:8000
+
+# For remote servers
+export LENINA_BASE_URL=http://your-server-ip:8000
+
+# Verify it's set
+echo $LENINA_BASE_URL
+```
+
+This variable is used in all curl examples throughout this guide.
+
 ## Endpoints
 
 ### GET /anvil/logs
@@ -16,13 +33,13 @@ Retrieve Anvil's console logs from the circular buffer (max 1000 lines).
 **Example:**
 ```bash
 # Get last 100 lines in markdown format
-curl "http://localhost:8000/anvil/logs?lines=100"
+curl "$LENINA_BASE_URL/anvil/logs?lines=100"
 
 # Get logs since sequence number 50
-curl "http://localhost:8000/anvil/logs?since=50&lines=50"
+curl "$LENINA_BASE_URL/anvil/logs?since=50&lines=50"
 
 # Get logs in JSON format
-curl "http://localhost:8000/anvil/logs?format=json"
+curl "$LENINA_BASE_URL/anvil/logs?format=json"
 ```
 
 **Response:**
@@ -57,10 +74,10 @@ Stream Anvil logs in real-time using Server-Sent Events (SSE).
 **Example:**
 ```bash
 # Stream new logs in markdown format
-curl -N "http://localhost:8000/anvil/logs/stream"
+curl -N "$LENINA_BASE_URL/anvil/logs/stream"
 
 # Stream logs since sequence 100
-curl -N "http://localhost:8000/anvil/logs/stream?since=100&format=text"
+curl -N "$LENINA_BASE_URL/anvil/logs/stream?since=100&format=text"
 ```
 
 **Response Format (SSE):**
@@ -76,7 +93,7 @@ data: eth_blockNumber
 
 ### JavaScript Example:
 ```javascript
-const eventSource = new EventSource('http://localhost:8000/anvil/logs/stream');
+const eventSource = new EventSource('$LENINA_BASE_URL/anvil/logs/stream');
 
 eventSource.onmessage = (event) => {
   console.log('New Anvil log:', event.data);
@@ -129,7 +146,7 @@ docker logs -t lenina
 By default, stopping Anvil clears the log buffer. To preserve logs after stopping:
 
 ```bash
-curl -X POST "http://localhost:8000/anvil/stop?preserve_logs=true"
+curl -X POST "$LENINA_BASE_URL/anvil/stop?preserve_logs=true"
 ```
 
 **Note**: Preserved logs are only accessible until the Lenina server restarts or Anvil is started again.
@@ -139,13 +156,13 @@ curl -X POST "http://localhost:8000/anvil/stop?preserve_logs=true"
 ### 1. Monitor Anvil Activity
 ```bash
 # Watch real-time activity
-watch -n 1 'curl -s "http://localhost:8000/anvil/logs?lines=10"'
+watch -n 1 'curl -s "$LENINA_BASE_URL/anvil/logs?lines=10"'
 ```
 
 ### 2. Debug Transaction Issues
 ```bash
 # Get logs since last known good state
-curl "http://localhost:8000/anvil/logs?since=1000&lines=100"
+curl "$LENINA_BASE_URL/anvil/logs?since=1000&lines=100"
 ```
 
 ### 3. Integrate with Monitoring Tools
@@ -153,7 +170,7 @@ curl "http://localhost:8000/anvil/logs?since=1000&lines=100"
 import requests
 
 def get_recent_logs(lines=50):
-    response = requests.get(f"http://localhost:8000/anvil/logs?lines={lines}")
+    response = requests.get(f"$LENINA_BASE_URL/anvil/logs?lines={lines}")
     return response.json()
 
 logs = get_recent_logs()

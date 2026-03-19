@@ -7,11 +7,40 @@ description: How to use the Lenina project (Anvil REST API management) using cur
 
 This skill provides complete workflow-style guidance for using the Lenina REST API with curl commands. Designed for users familiar with curl but new to blockchain/Anvil concepts.
 
+## ⚠️ Important: AI Agent Instructions
+
+**Before providing any curl commands or Lenina API assistance:**
+
+1. **Check if LENINA_BASE_URL is known:**
+   - Look for the user mentioning the URL (e.g., "http://mini:8000", "http://localhost:8000")
+   - Check if the user has previously set or referenced `LENINA_BASE_URL`
+   - Look for environment context indicating the Lenina server address
+
+2. **If LENINA_BASE_URL is NOT known, ASK THE USER:**
+   ```
+   "Before I can help with Lenina commands, what's your Lenina server URL? 
+   You can check by running: echo $LENINA_BASE_URL
+   
+   Common values are:
+   - Local: http://localhost:8000
+   - Docker: http://localhost:8000
+   - Remote server: http://your-server-ip:8000"
+   ```
+
+3. **Once you have the URL, confirm it:**
+   ```
+   "Great! I'll use LENINA_BASE_URL=http://mini:8000 for all commands."
+   ```
+
+4. **Always use $LENINA_BASE_URL variable in examples** so users can easily substitute their actual URL.
+
+---
+
 ## Configuration
 
-**Lenina Base URL:** `http://mini:8000`
+**Lenina Base URL:** User-specific (ask if not provided)
 
-**Anvil RPC URL:** `http://192.168.1.12:8545` (remote server)
+**Anvil RPC URL:** User-specific (typically same host, port 8545)
 
 **GitHub:** https://github.com/brenoluz/lenina
 
@@ -27,6 +56,16 @@ export LENINA_BASE_URL=http://mini:8000
 ```
 
 **Note:** Always use `$LENINA_BASE_URL` in curl commands after setting the URL.
+
+### Verify Your Setup
+
+```bash
+# Check if variable is set
+echo $LENINA_BASE_URL
+
+# Test connection
+curl $LENINA_BASE_URL/health
+```
 
 ## Workflow 1: Getting Started
 

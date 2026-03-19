@@ -2,6 +2,23 @@
 
 Production and development deployment guide for Lenina.
 
+## Environment Setup
+
+Before using the examples in this guide, set the `LENINA_BASE_URL` environment variable:
+
+```bash
+# For local development
+export LENINA_BASE_URL=http://localhost:8000
+
+# For remote servers
+export LENINA_BASE_URL=http://your-server-ip:8000
+
+# Verify it's set
+echo $LENINA_BASE_URL
+```
+
+This variable is used in all curl examples throughout this guide.
+
 ## Table of Contents
 
 - [Local Development](#local-development)
@@ -60,7 +77,7 @@ Production and development deployment guide for Lenina.
 
 5. **Verify it's running**
    ```bash
-   curl http://localhost:8000/health
+   curl $LENINA_BASE_URL/health
    ```
 
 ### Configuration
@@ -122,7 +139,7 @@ docker ps | grep lenina
 docker logs lenina
 
 # Test health endpoint
-curl http://localhost:8000/health
+curl $LENINA_BASE_URL/health
 ```
 
 ### Stop Container
@@ -155,7 +172,7 @@ services:
     volumes:
       - lenina-data:/root/.foundry
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "$LENINA_BASE_URL/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -335,7 +352,7 @@ env_file:
 ### Health Endpoint
 
 ```bash
-curl http://localhost:8000/health
+curl $LENINA_BASE_URL/health
 ```
 
 **Response:**
@@ -349,7 +366,7 @@ curl http://localhost:8000/health
 ### Status Endpoint
 
 ```bash
-curl http://localhost:8000/anvil/status
+curl $LENINA_BASE_URL/anvil/status
 ```
 
 **Response (running):**
@@ -367,7 +384,7 @@ curl http://localhost:8000/anvil/status
 Dockerfile includes health check:
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
+  CMD curl -f $LENINA_BASE_URL/health || exit 1
 ```
 
 ### Prometheus Metrics (Future)
@@ -446,7 +463,7 @@ export LENINA_PORT=8001
 **Diagnosis:**
 ```bash
 # Check response times
-curl -w "@curl-format.txt" -o /dev/null -s http://localhost:8000/health
+curl -w "@curl-format.txt" -o /dev/null -s $LENINA_BASE_URL/health
 ```
 
 **Solutions:**
@@ -572,7 +589,7 @@ jobs:
       run: |
         docker run -d --name lenina-test -p 8000:8000 lenina:test
         sleep 5
-        curl http://localhost:8000/health
+        curl $LENINA_BASE_URL/health
 ```
 
 ---

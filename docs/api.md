@@ -4,8 +4,17 @@ Complete API reference for Lenina - Anvil RESTful Management.
 
 ## Base URL
 
-- **Local:** `http://localhost:8000`
-- **Docker:** `http://localhost:8000` (configurable)
+Set the environment variable for consistent usage:
+
+```bash
+export LENINA_BASE_URL=http://localhost:8000
+```
+
+- **Local:** `$LENINA_BASE_URL` (defaults to `http://localhost:8000`)
+- **Docker:** `$LENINA_BASE_URL` (configurable via port mapping)
+- **Remote:** `$LENINA_BASE_URL` (e.g., `http://your-server:8000`)
+
+**Note:** All examples below assume `LENINA_BASE_URL` is set. Replace with your actual URL if needed.
 
 ## Authentication
 
@@ -527,17 +536,17 @@ POST /anvil/mining/mine
 
 Mine 1 block:
 ```bash
-curl -X POST http://localhost:8000/anvil/mining/mine
+curl -X POST $LENINA_BASE_URL/anvil/mining/mine
 ```
 
 Mine 10 blocks:
 ```bash
-curl -X POST "http://localhost:8000/anvil/mining/mine?blocks=10"
+curl -X POST "$LENINA_BASE_URL/anvil/mining/mine?blocks=10"
 ```
 
 Mine 5 blocks with 0.5s interval:
 ```bash
-curl -X POST "http://localhost:8000/anvil/mining/mine?blocks=5&interval=0.5"
+curl -X POST "$LENINA_BASE_URL/anvil/mining/mine?blocks=5&interval=0.5"
 ```
 
 **Response:** `200 OK`
@@ -600,9 +609,18 @@ All errors follow the FastAPI standard format:
 
 Interactive API documentation is available at:
 
-- **Swagger UI:** `http://localhost:8000/docs`
-- **ReDoc:** `http://localhost:8000/redoc`
-- **OpenAPI JSON:** `http://localhost:8000/openapi.json`
+- **Swagger UI:** `$LENINA_BASE_URL/docs`
+- **ReDoc:** `$LENINA_BASE_URL/redoc`
+- **OpenAPI JSON:** `$LENINA_BASE_URL/openapi.json`
+
+**Example:**
+```bash
+# Open in browser
+open $LENINA_BASE_URL/docs
+
+# Or with curl
+curl $LENINA_BASE_URL/openapi.json | jq .
+```
 
 ---
 

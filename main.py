@@ -1,7 +1,8 @@
 """
 Lenina - Anvil RESTful Management API
 """
-from fastapi import FastAPI, HTTPException, Path
+
+from fastapi import FastAPI, HTTPException, Path, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -15,55 +16,64 @@ from datetime import datetime
 import httpx
 import socket
 
+
 def get_version() -> str:
     """Get version from package metadata or git"""
     try:
         from importlib.metadata import version
+
         return version("lenina")
     except Exception:
         pass
-    
+
     try:
         import subprocess
+
         result = subprocess.run(
-            ["git", "describe", "--tags", "--always"],
-            capture_output=True, text=True, timeout=5
+            ["git", "describe", "--tags", "--always"], capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
             return result.stdout.strip()
     except Exception:
         pass
-    
+
     return "unknown"
+
 
 __version__ = get_version()
 
 app = FastAPI(
     title="Lenina",
     description="RESTful API for managing Anvil (Foundry's local Ethereum blockchain)",
-    version=__version__
+    version=__version__,
 )
 
 
 class AnvilConfig(BaseModel):
     """Configuration for starting Anvil"""
+
     port: Optional[int] = Field(default=8545, description="Anvil RPC port")
     chainId: Optional[int] = Field(default=31337, description="Chain ID")
     blockTime: Optional[int] = Field(default=0, description="Block time in seconds (0 for auto)")
     gasLimit: Optional[int] = Field(default=30000000, description="Gas limit per block")
     mnemonic: Optional[str] = Field(default=None, description="HD wallet mnemonic (12-24 words)")
 
-    model_config = {'json_schema_extra': {'example': {
-        'port': 8545,
-        'chainId': 31337,
-        'blockTime': 0,
-        'gasLimit': 30000000,
-        'mnemonic': None
-    }}}
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "port": 8545,
+                "chainId": 31337,
+                "blockTime": 0,
+                "gasLimit": 30000000,
+                "mnemonic": None,
+            }
+        }
+    }
 
 
 class AnvilStatus(BaseModel):
     """Status of Anvil instance"""
+
     running: bool
     pid: Optional[int] = None
     uptime: Optional[float] = None
@@ -72,6 +82,7 @@ class AnvilStatus(BaseModel):
 
 class AnvilStartResponse(BaseModel):
     """Response from starting Anvil"""
+
     pid: int
     port: int
     chainId: int
@@ -80,12 +91,14 @@ class AnvilStartResponse(BaseModel):
 
 class AnvilStopResponse(BaseModel):
     """Response from stopping Anvil"""
+
     status: str
     message: str
 
 
 class AnvilRestartResponse(BaseModel):
     """Response from restarting Anvil"""
+
     pid: int
     port: int
     chainId: int
@@ -93,20 +106,50 @@ class AnvilRestartResponse(BaseModel):
     message: str
 
 
+class MiningConfig(BaseModel):
+    """Configuration for mining control"""
+
+    interval: Optional[float] = Field(
+        default=0, description="Block time interval in seconds (0 for on-demand)"
+    )
+    autoMine: Optional[bool] = Field(default=None, description="Enable/disable auto-mining")
+
+    model_config = {"json_schema_extra": {"example": {"interval": 0, "autoMine": False}}}
+
+
+class MiningStatusResponse(BaseModel):
+    """Response from getting mining status"""
+
+    autoMine: bool
+    interval: float
+    blockNumber: int
+
+
+class MineBlocksResponse(BaseModel):
+    """Response from mining blocks"""
+
+    blocksMined: int
+    newBlockNumber: int
+    status: str
+
+
 class PrivateKeyInfo(BaseModel):
     """Private key and address pair"""
+
     address: str
     privateKey: str
 
 
 class AnvilKeysResponse(BaseModel):
     """Response from getting private keys"""
+
     accounts: List[PrivateKeyInfo]
     mnemonic: Optional[str] = None
 
 
 class ContractDetailsResponse(BaseModel):
     """Response from checking contract at address"""
+
     address: str
     bytecodeHash: str
     deploymentBlock: Optional[int] = None
@@ -115,6 +158,7 @@ class ContractDetailsResponse(BaseModel):
 
 class AnvilConfigResponse(BaseModel):
     """Response from getting Anvil configuration"""
+
     ip: str
     port: int
     chainId: int
@@ -126,6 +170,7 @@ class AnvilConfigResponse(BaseModel):
 
 class RpcRequest(BaseModel):
     """JSON-RPC request model"""
+
     jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
     method: str = Field(..., description="RPC method name")
     params: Optional[List[Any]] = Field(default=None, description="RPC method parameters")
@@ -134,6 +179,7 @@ class RpcRequest(BaseModel):
 
 class RpcResponse(BaseModel):
     """JSON-RPC response model"""
+
     jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
     result: Optional[Any] = Field(default=None, description="RPC result")
     error: Optional[Dict[str, Any]] = Field(default=None, description="RPC error if any")
@@ -142,6 +188,7 @@ class RpcResponse(BaseModel):
 
 class LogEntry(BaseModel):
     """Single log entry"""
+
     line: str
     timestamp: float
     sequence: int
@@ -149,6 +196,7 @@ class LogEntry(BaseModel):
 
 class AnvilLogsResponse(BaseModel):
     """Response from getting Anvil logs"""
+
     lines: List[LogEntry]
     totalLines: int
     truncated: bool
@@ -180,17 +228,20 @@ def get_lan_ip() -> str:
         return "127.0.0.1"
 
 
+def to_hex(value: int | float) -> str:
+    """Convert a number to hex string with 0x prefix"""
+    return hex(int(value))
+
+
 def append_log_line(line: str) -> None:
     """Append a log line to the circular buffer"""
     global anvil_logs, anvil_log_sequence
-    
+
     anvil_log_sequence += 1
-    anvil_logs.append({
-        "line": line.rstrip(),
-        "timestamp": time.time(),
-        "sequence": anvil_log_sequence
-    })
-    
+    anvil_logs.append(
+        {"line": line.rstrip(), "timestamp": time.time(), "sequence": anvil_log_sequence}
+    )
+
     if len(anvil_logs) > LOG_BUFFER_MAX:
         anvil_logs.pop(0)
 
@@ -199,7 +250,7 @@ def format_logs_as_markdown(logs: List[Dict[str, Any]]) -> str:
     """Format logs as markdown code block"""
     if not logs:
         return "```\nNo logs available\n```"
-    
+
     formatted = "\n".join(entry["line"] for entry in logs)
     return f"```\n{formatted}\n```"
 
@@ -207,9 +258,9 @@ def format_logs_as_markdown(logs: List[Dict[str, Any]]) -> str:
 async def capture_anvil_output():
     """Continuously capture Anvil stdout in background"""
     global anvil_process
-    
+
     current_block = 0
-    
+
     while anvil_process is not None and anvil_process.poll() is None:
         if anvil_process.stdout:
             try:
@@ -217,7 +268,7 @@ async def capture_anvil_output():
                 if output:
                     for line in output.splitlines():
                         append_log_line(line)
-                        
+
                         block_match = re.search(r"Block\s+(\d+)", line, re.IGNORECASE)
                         if block_match:
                             current_block = int(block_match.group(1))
@@ -242,16 +293,10 @@ async def get_avnil_config() -> AnvilConfigResponse:
     """
     # Check if Anvil is running
     if anvil_process is None or anvil_process.poll() is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No Anvil instance is running"
-        )
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
 
     if not anvil_config:
-        raise HTTPException(
-            status_code=500,
-            detail="Anvil configuration not available"
-        )
+        raise HTTPException(status_code=500, detail="Anvil configuration not available")
 
     return AnvilConfigResponse(
         ip=get_lan_ip(),
@@ -260,7 +305,7 @@ async def get_avnil_config() -> AnvilConfigResponse:
         version=__version__,
         blockTime=anvil_config.get("blockTime", 0),
         gasLimit=anvil_config.get("gasLimit", 30000000),
-        mnemonic=anvil_config.get("mnemonic")
+        mnemonic=anvil_config.get("mnemonic"),
     )
 
 
@@ -274,25 +319,20 @@ async def get_private_keys() -> AnvilKeysResponse:
     """
     # Check if Anvil is running
     if anvil_process is None or anvil_process.poll() is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No Anvil instance is running"
-        )
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
 
     if not anvil_accounts:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve private keys from Anvil"
-        )
+        raise HTTPException(status_code=500, detail="Failed to retrieve private keys from Anvil")
 
     return AnvilKeysResponse(
-        accounts=anvil_accounts,
-        mnemonic=anvil_config.get("mnemonic") if anvil_config else None
+        accounts=anvil_accounts, mnemonic=anvil_config.get("mnemonic") if anvil_config else None
     )
 
 
 @app.get("/anvil/contract/{address}", response_model=ContractDetailsResponse)
-async def get_contract(address: str = Path(..., description="Contract address to check")) -> ContractDetailsResponse:
+async def get_contract(
+    address: str = Path(..., description="Contract address to check"),
+) -> ContractDetailsResponse:
     """
     Check if a contract exists at the specified address.
 
@@ -302,17 +342,11 @@ async def get_contract(address: str = Path(..., description="Contract address to
     """
     # Check if Anvil is running
     if anvil_process is None or anvil_process.poll() is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No Anvil instance is running"
-        )
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
 
     # Validate address format
     if not re.match(r"^0x[0-9a-fA-F]{40}$", address):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid Ethereum address format"
-        )
+        raise HTTPException(status_code=400, detail="Invalid Ethereum address format")
 
     # Get the Anvil port from config
     port = anvil_config.get("port", 8545) if anvil_config else 8545
@@ -327,16 +361,16 @@ async def get_contract(address: str = Path(..., description="Contract address to
                     "jsonrpc": "2.0",
                     "method": "eth_getCode",
                     "params": [address, "latest"],
-                    "id": 1
+                    "id": 1,
                 },
-                timeout=10.0
+                timeout=10.0,
             )
             result = response.json()
 
             if "error" in result:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"RPC error: {result['error'].get('message', 'Unknown error')}"
+                    detail=f"RPC error: {result['error'].get('message', 'Unknown error')}",
                 )
 
             bytecode = result.get("result", "0x")
@@ -344,30 +378,22 @@ async def get_contract(address: str = Path(..., description="Contract address to
             # If bytecode is "0x" or empty, no contract at address
             if bytecode == "0x" or not bytecode:
                 raise HTTPException(
-                    status_code=404,
-                    detail=f"No contract deployed at address {address}"
+                    status_code=404, detail=f"No contract deployed at address {address}"
                 )
 
             # Calculate bytecode hash
             import hashlib
+
             bytecode_hash = "0x" + hashlib.sha256(bytecode.encode()).hexdigest()
 
             return ContractDetailsResponse(
-                address=address,
-                bytecodeHash=bytecode_hash,
-                bytecode=bytecode
+                address=address, bytecodeHash=bytecode_hash, bytecode=bytecode
             )
 
     except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=400,
-            detail="Timeout connecting to Anvil RPC"
-        )
+        raise HTTPException(status_code=400, detail="Timeout connecting to Anvil RPC")
     except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to connect to Anvil RPC: {str(e)}"
-        )
+        raise HTTPException(status_code=400, detail=f"Failed to connect to Anvil RPC: {str(e)}")
 
 
 @app.post("/anvil/start", response_model=AnvilStartResponse)
@@ -382,10 +408,7 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
 
     # Check if already running
     if anvil_process is not None and anvil_process.poll() is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Anvil is already running"
-        )
+        raise HTTPException(status_code=400, detail="Anvil is already running")
 
     # Use provided config or defaults
     cfg = config.dict() if config else {}
@@ -398,10 +421,14 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
     # Build Anvil command
     cmd = [
         "anvil",
-        "--port", str(port),
-        "--chain-id", str(chain_id),
-        "--gas-limit", str(gas_limit),
-        "--host", "0.0.0.0",
+        "--port",
+        str(port),
+        "--chain-id",
+        str(chain_id),
+        "--gas-limit",
+        str(gas_limit),
+        "--host",
+        "0.0.0.0",
     ]
 
     if block_time > 0:
@@ -412,16 +439,16 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
 
     try:
         import fcntl
-        
+
         # Start Anvil process
         anvil_process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            preexec_fn=os.setsid if os.name != "nt" else None
+            preexec_fn=os.setsid if os.name != "nt" else None,
         )
-        
+
         # Set stdout to non-blocking mode
         if anvil_process.stdout and os.name != "nt":
             flags = fcntl.fcntl(anvil_process.stdout.fileno(), fcntl.F_GETFL)
@@ -439,10 +466,7 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
                     output = anvil_process.stdout.read()
             except Exception:
                 pass
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to start Anvil: {output}"
-            )
+            raise HTTPException(status_code=500, detail=f"Failed to start Anvil: {output}")
 
         # Parse Anvil's output to extract private keys and addresses
         # Read available output in non-blocking mode
@@ -468,10 +492,9 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
         min_count = min(len(addresses), len(private_keys))
 
         for i in range(min_count):
-            anvil_accounts.append(PrivateKeyInfo(
-                address=addresses[i][1],
-                privateKey=private_keys[i][1]
-            ))
+            anvil_accounts.append(
+                PrivateKeyInfo(address=addresses[i][1], privateKey=private_keys[i][1])
+            )
 
         anvil_start_time = time.time()
         anvil_config = {
@@ -479,28 +502,19 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
             "chainId": chain_id,
             "blockTime": block_time,
             "gasLimit": gas_limit,
-            "mnemonic": mnemonic
+            "mnemonic": mnemonic,
         }
 
         asyncio.create_task(capture_anvil_output())
 
         return AnvilStartResponse(
-            pid=anvil_process.pid,
-            port=port,
-            chainId=chain_id,
-            status="running"
+            pid=anvil_process.pid, port=port, chainId=chain_id, status="running"
         )
 
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=500,
-            detail="Anvil not found. Ensure Foundry is installed."
-        )
+        raise HTTPException(status_code=500, detail="Anvil not found. Ensure Foundry is installed.")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start Anvil: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to start Anvil: {str(e)}")
 
 
 @app.post("/anvil/stop", response_model=AnvilStopResponse)
@@ -511,14 +525,17 @@ async def stop_anvil(preserve_logs: bool = False) -> AnvilStopResponse:
     Returns 400 if no Anvil instance is running.
     Gracefully terminates the process.
     """
-    global anvil_process, anvil_start_time, anvil_config, anvil_accounts, anvil_logs, anvil_log_sequence
+    global \
+        anvil_process, \
+        anvil_start_time, \
+        anvil_config, \
+        anvil_accounts, \
+        anvil_logs, \
+        anvil_log_sequence
 
     # Check if Anvil is running
     if anvil_process is None or anvil_process.poll() is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No Anvil instance is running"
-        )
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
 
     pid = anvil_process.pid  # Get pid before any operations
 
@@ -544,8 +561,7 @@ async def stop_anvil(preserve_logs: bool = False) -> AnvilStopResponse:
             anvil_log_sequence = 0
 
         return AnvilStopResponse(
-            status="stopped",
-            message=f"Anvil instance (PID {pid}) has been stopped"
+            status="stopped", message=f"Anvil instance (PID {pid}) has been stopped"
         )
 
     except subprocess.TimeoutExpired:
@@ -565,16 +581,10 @@ async def stop_anvil(preserve_logs: bool = False) -> AnvilStopResponse:
             anvil_logs.clear()
             anvil_log_sequence = 0
 
-        return AnvilStopResponse(
-            status="stopped",
-            message=f"Anvil instance was forcefully stopped"
-        )
+        return AnvilStopResponse(status="stopped", message=f"Anvil instance was forcefully stopped")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to stop Anvil: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to stop Anvil: {str(e)}")
 
 
 @app.get("/anvil/status", response_model=AnvilStatus)
@@ -592,100 +602,84 @@ async def get_anvil_status() -> AnvilStatus:
             running=True,
             pid=anvil_process.pid,
             uptime=uptime,
-            port=anvil_config.get("port") if anvil_config else None
+            port=anvil_config.get("port") if anvil_config else None,
         )
     else:
-        return AnvilStatus(
-            running=False,
-            pid=None,
-            uptime=None,
-            port=None
-        )
+        return AnvilStatus(running=False, pid=None, uptime=None, port=None)
 
 
 @app.get("/anvil/logs", response_model=AnvilLogsResponse)
 async def get_anvil_logs(
-    lines: int = 100,
-    since: Optional[int] = None,
-    format: str = "markdown"
+    lines: int = 100, since: Optional[int] = None, format: str = "markdown"
 ) -> AnvilLogsResponse:
     """
     Get Anvil console logs.
-    
+
     - **lines**: Number of recent lines (1-1000, default: 100)
     - **since**: Optional sequence number to get logs after
     - **format**: Output format - markdown, json, or text
-    
+
     Returns logs in circular buffer (max 1000 lines).
     Returns 400 if no Anvil instance is running.
     """
     if anvil_process is None or anvil_process.poll() is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No Anvil instance is running"
-        )
-    
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
+
     filtered_logs = anvil_logs.copy()
-    
+
     if since is not None:
         filtered_logs = [log for log in filtered_logs if log["sequence"] > since]
-    
+
     recent_logs = filtered_logs[-lines:] if lines else filtered_logs
-    
+
     return AnvilLogsResponse(
         lines=[LogEntry(**log) for log in recent_logs],
         totalLines=len(anvil_logs),
         truncated=len(recent_logs) < len(filtered_logs),
-        format=format
+        format=format,
     )
 
 
 @app.get("/anvil/logs/stream")
-async def stream_anvil_logs(
-    since: Optional[int] = None,
-    format: str = "markdown"
-):
+async def stream_anvil_logs(since: Optional[int] = None, format: str = "markdown"):
     """
     Stream Anvil logs in real-time using Server-Sent Events (SSE).
-    
+
     - **since**: Optional sequence number to start from (default: end of current buffer)
     - **format**: Output format - markdown or text
-    
+
     Returns event stream with new log lines as they arrive.
     Connection closes when Anvil stops.
     """
     if anvil_process is None or anvil_process.poll() is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No Anvil instance is running"
-        )
-    
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
+
     async def event_generator():
         last_sequence = since if since is not None else (anvil_log_sequence or 0)
-        
+
         while anvil_process is not None and anvil_process.poll() is None:
             new_logs = [log for log in anvil_logs if log["sequence"] > last_sequence]
-            
+
             for log in new_logs:
                 if format == "markdown":
                     data = f"```\n{log['line']}\n```"
                 else:
                     data = log["line"]
-                
+
                 yield f"data: {data}\n\n"
                 last_sequence = log["sequence"]
-            
+
             yield f": keepalive\n\n"
             await asyncio.sleep(0.5)
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
@@ -700,10 +694,7 @@ async def proxy_rpc(request: RpcRequest) -> RpcResponse:
     """
     # Check if Anvil is running
     if anvil_process is None or anvil_process.poll() is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No Anvil instance is running"
-        )
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
 
     # Get the Anvil port from config
     port = anvil_config.get("port", 8545) if anvil_config else 8545
@@ -718,9 +709,9 @@ async def proxy_rpc(request: RpcRequest) -> RpcResponse:
                     "jsonrpc": request.jsonrpc,
                     "method": request.method,
                     "params": request.params or [],
-                    "id": request.id
+                    "id": request.id,
                 },
-                timeout=30.0
+                timeout=30.0,
             )
             result = response.json()
 
@@ -728,19 +719,255 @@ async def proxy_rpc(request: RpcRequest) -> RpcResponse:
                 jsonrpc=result.get("jsonrpc", "2.0"),
                 result=result.get("result"),
                 error=result.get("error"),
-                id=result.get("id")
+                id=result.get("id"),
             )
 
     except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=400,
-            detail="Timeout connecting to Anvil RPC"
-        )
+        raise HTTPException(status_code=400, detail="Timeout connecting to Anvil RPC")
     except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to connect to Anvil RPC: {str(e)}"
-        )
+        raise HTTPException(status_code=400, detail=f"Failed to connect to Anvil RPC: {str(e)}")
+
+
+@app.post("/anvil/mining/disable", response_model=MiningStatusResponse)
+async def disable_auto_mining() -> MiningStatusResponse:
+    """
+    Disable auto-mining in Anvil.
+
+    After disabling, blocks will only be mined when explicitly requested via /anvil/mining/mine.
+    This is useful for testing scenarios where you need precise control over block production.
+
+    Returns 400 if Anvil is not running.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
+
+    port = anvil_config.get("port", 8545) if anvil_config else 8545
+    rpc_url = f"http://127.0.0.1:{port}"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # Use evm_setAutomine to disable auto-mining
+            response = await client.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "method": "evm_setAutomine", "params": [False], "id": 1},
+                timeout=10.0,
+            )
+            result = response.json()
+
+            if "error" in result:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"RPC error: {result['error'].get('message', 'Unknown error')}",
+                )
+
+            # Get current block number
+            block_response = await client.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 2},
+                timeout=10.0,
+            )
+            block_result = block_response.json()
+            block_number = int(block_result.get("result", "0x0"), 16)
+
+            # Update config to reflect mining disabled
+            if anvil_config:
+                anvil_config["blockTime"] = 0
+
+            return MiningStatusResponse(autoMine=False, interval=0, blockNumber=block_number)
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=400, detail="Timeout connecting to Anvil RPC")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to connect to Anvil RPC: {str(e)}")
+
+
+@app.post("/anvil/mining/enable", response_model=MiningStatusResponse)
+async def enable_auto_mining(config: Optional[MiningConfig] = None) -> MiningStatusResponse:
+    """
+    Enable auto-mining in Anvil.
+
+    - **interval**: Parameter accepted but ignored (interval mining must be set at startup via /anvil/start with blockTime)
+    - **autoMine**: Set to True to enable auto-mining
+
+    Note: For interval mining, restart Anvil with blockTime parameter: POST /anvil/restart with {"blockTime": N}
+
+    Returns 400 if Anvil is not running.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
+
+    port = anvil_config.get("port", 8545) if anvil_config else 8545
+    rpc_url = f"http://127.0.0.1:{port}"
+
+    cfg = config.dict() if config else {}
+    interval = cfg.get("interval", 0)
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # Use evm_setAutomine to enable auto-mining
+            response = await client.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "method": "evm_setAutomine", "params": [True], "id": 1},
+                timeout=10.0,
+            )
+            result = response.json()
+
+            if "error" in result:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"RPC error: {result['error'].get('message', 'Unknown error')}",
+                )
+
+            # Note: evm_setIntervalMining is not a standard Anvil RPC method
+            # Interval mining must be set at startup via --block-time flag
+            # We just use the configured interval for reporting purposes
+
+            # Get current block number
+            block_response = await client.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 2},
+                timeout=10.0,
+            )
+            block_result = block_response.json()
+            block_number = int(block_result.get("result", "0x0"), 16)
+
+            # Update config to reflect mining enabled
+            if anvil_config:
+                anvil_config["blockTime"] = interval if interval > 0 else 0
+
+            return MiningStatusResponse(
+                autoMine=True, interval=interval if interval > 0 else 0, blockNumber=block_number
+            )
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=400, detail="Timeout connecting to Anvil RPC")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to connect to Anvil RPC: {str(e)}")
+
+
+@app.get("/anvil/mining/status", response_model=MiningStatusResponse)
+async def get_mining_status() -> MiningStatusResponse:
+    """
+    Get current mining status.
+
+    Returns information about auto-mining status, interval, and current block number.
+    Returns 400 if Anvil is not running.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
+
+    port = anvil_config.get("port", 8545) if anvil_config else 8545
+    rpc_url = f"http://127.0.0.1:{port}"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get current block number
+            block_response = await client.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 1},
+                timeout=10.0,
+            )
+            block_result = block_response.json()
+
+            if "error" in block_result:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"RPC error: {block_result['error'].get('message', 'Unknown error')}",
+                )
+
+            block_number = int(block_result.get("result", "0x0"), 16)
+
+            # Get interval from config
+            interval = anvil_config.get("blockTime", 0) if anvil_config else 0
+
+            # Auto-mine is considered enabled if interval is set or default behavior
+            # Note: We can't directly query evm automine status, so we infer from config
+            auto_mine = interval == 0  # Instant mining when interval is 0
+
+            return MiningStatusResponse(
+                autoMine=auto_mine, interval=interval, blockNumber=block_number
+            )
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=400, detail="Timeout connecting to Anvil RPC")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to connect to Anvil RPC: {str(e)}")
+
+
+@app.post("/anvil/mining/mine", response_model=MineBlocksResponse)
+async def mine_blocks(
+    blocks: int = Query(default=1, ge=1, le=1000, description="Number of blocks to mine (1-1000)"),
+    interval: Optional[float] = Query(
+        default=None, description="Interval in seconds between blocks"
+    ),
+) -> MineBlocksResponse:
+    """
+    Manually mine blocks.
+
+    - **blocks**: Number of blocks to mine (default: 1, max: 1000)
+    - **interval**: Optional interval in seconds between each mined block
+
+    This is useful when auto-mining is disabled and you need to produce blocks on demand.
+    Returns 400 if Anvil is not running.
+    """
+    # Check if Anvil is running
+    if anvil_process is None or anvil_process.poll() is not None:
+        raise HTTPException(status_code=400, detail="No Anvil instance is running")
+
+    port = anvil_config.get("port", 8545) if anvil_config else 8545
+    rpc_url = f"http://127.0.0.1:{port}"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # Use anvil_mine to mine blocks
+            # If interval is provided, use it; otherwise mine instantly
+            # Anvil RPC expects hex-encoded numbers
+            params: List[Any] = [to_hex(blocks)]
+            if interval is not None:
+                params.append(
+                    to_hex(int(interval * 1000))
+                )  # Convert to milliseconds for anvil_mine
+
+            response = await client.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "method": "anvil_mine", "params": params, "id": 1},
+                timeout=30.0,
+            )
+            result = response.json()
+
+            if "error" in result:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"RPC error: {result['error'].get('message', 'Unknown error')}",
+                )
+
+            # Get new block number after mining
+            block_response = await client.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 2},
+                timeout=10.0,
+            )
+            block_result = block_response.json()
+
+            if "error" in block_result:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"RPC error: {block_result['error'].get('message', 'Unknown error')}",
+                )
+
+            new_block_number = int(block_result.get("result", "0x0"), 16)
+
+            return MineBlocksResponse(
+                blocksMined=blocks, newBlockNumber=new_block_number, status="success"
+            )
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=400, detail="Timeout connecting to Anvil RPC")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to connect to Anvil RPC: {str(e)}")
 
 
 @app.post("/anvil/restart", response_model=AnvilRestartResponse)
@@ -796,10 +1023,14 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
 
     cmd = [
         "anvil",
-        "--port", str(port),
-        "--chain-id", str(chain_id),
-        "--gas-limit", str(gas_limit),
-        "--host", "0.0.0.0",
+        "--port",
+        str(port),
+        "--chain-id",
+        str(chain_id),
+        "--gas-limit",
+        str(gas_limit),
+        "--host",
+        "0.0.0.0",
     ]
 
     if block_time > 0:
@@ -810,15 +1041,15 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
 
     try:
         import fcntl
-        
+
         anvil_process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            preexec_fn=os.setsid if os.name != "nt" else None
+            preexec_fn=os.setsid if os.name != "nt" else None,
         )
-        
+
         # Set stdout to non-blocking mode
         if anvil_process.stdout and os.name != "nt":
             flags = fcntl.fcntl(anvil_process.stdout.fileno(), fcntl.F_GETFL)
@@ -833,10 +1064,7 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
                     output = anvil_process.stdout.read()
             except Exception:
                 pass
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to start Anvil: {output}"
-            )
+            raise HTTPException(status_code=500, detail=f"Failed to start Anvil: {output}")
 
         # Parse Anvil's output to extract private keys and addresses
         # Read available output in non-blocking mode
@@ -859,10 +1087,9 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
         min_count = min(len(addresses), len(private_keys))
 
         for i in range(min_count):
-            anvil_accounts.append(PrivateKeyInfo(
-                address=addresses[i][1],
-                privateKey=private_keys[i][1]
-            ))
+            anvil_accounts.append(
+                PrivateKeyInfo(address=addresses[i][1], privateKey=private_keys[i][1])
+            )
 
         anvil_start_time = time.time()
         anvil_config = {
@@ -870,7 +1097,7 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
             "chainId": chain_id,
             "blockTime": block_time,
             "gasLimit": gas_limit,
-            "mnemonic": mnemonic
+            "mnemonic": mnemonic,
         }
 
         asyncio.create_task(capture_anvil_output())
@@ -880,21 +1107,16 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
             port=port,
             chainId=chain_id,
             status="running",
-            message="Anvil instance restarted successfully"
+            message="Anvil instance restarted successfully",
         )
 
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=500,
-            detail="Anvil not found. Ensure Foundry is installed."
-        )
+        raise HTTPException(status_code=500, detail="Anvil not found. Ensure Foundry is installed.")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to restart Anvil: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to restart Anvil: {str(e)}")
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

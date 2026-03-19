@@ -34,6 +34,9 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy .git directory for version detection (if exists)
+COPY .git/ .git/
+
 # Copy application code
 COPY main.py .
 

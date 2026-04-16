@@ -429,6 +429,7 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
         str(gas_limit),
         "--host",
         "0.0.0.0",
+        "--no-mining",
     ]
 
     if block_time > 0:
@@ -503,6 +504,7 @@ async def start_anvil(config: Optional[AnvilConfig] = None) -> AnvilStartRespons
             "blockTime": block_time,
             "gasLimit": gas_limit,
             "mnemonic": mnemonic,
+            "autoMine": False,  # --no-auto-mine disables auto-mining by default
         }
 
         asyncio.create_task(capture_anvil_output())
@@ -773,6 +775,7 @@ async def disable_auto_mining() -> MiningStatusResponse:
             # Update config to reflect mining disabled
             if anvil_config:
                 anvil_config["blockTime"] = 0
+                anvil_config["autoMine"] = False
 
             return MiningStatusResponse(autoMine=False, interval=0, blockNumber=block_number)
 
@@ -836,6 +839,7 @@ async def enable_auto_mining(config: Optional[MiningConfig] = None) -> MiningSta
             # Update config to reflect mining enabled
             if anvil_config:
                 anvil_config["blockTime"] = interval if interval > 0 else 0
+                anvil_config["autoMine"] = True
 
             return MiningStatusResponse(
                 autoMine=True, interval=interval if interval > 0 else 0, blockNumber=block_number
@@ -883,9 +887,8 @@ async def get_mining_status() -> MiningStatusResponse:
             # Get interval from config
             interval = anvil_config.get("blockTime", 0) if anvil_config else 0
 
-            # Auto-mine is considered enabled if interval is set or default behavior
-            # Note: We can't directly query evm automine status, so we infer from config
-            auto_mine = interval == 0  # Instant mining when interval is 0
+            # Get auto-mine state from config (set to False when --no-auto-mine is used)
+            auto_mine = anvil_config.get("autoMine", False) if anvil_config else False
 
             return MiningStatusResponse(
                 autoMine=auto_mine, interval=interval, blockNumber=block_number
@@ -1031,6 +1034,7 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
         str(gas_limit),
         "--host",
         "0.0.0.0",
+        "--no-mining",
     ]
 
     if block_time > 0:
@@ -1098,6 +1102,7 @@ async def restart_anvil(config: Optional[AnvilConfig] = None) -> AnvilRestartRes
             "blockTime": block_time,
             "gasLimit": gas_limit,
             "mnemonic": mnemonic,
+            "autoMine": False,  # --no-auto-mine disables auto-mining by default
         }
 
         asyncio.create_task(capture_anvil_output())
